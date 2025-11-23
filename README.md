@@ -100,8 +100,7 @@ Cross-platform command-line tool for managing Minecraft Java Edition servers on 
    - Installer includes npm automatically
 
 2. **Install Java**
-   - Download from [Adoptium](https://adoptium.net/) (recommended)
-   - Or use [Oracle Java](https://www.oracle.com/java/technologies/downloads/)
+   - Download from [Oracle Java](https://www.oracle.com/java/technologies/downloads/)
    - Choose Java 21 for best compatibility
    - Verify installation:
      ```powershell
@@ -179,8 +178,8 @@ npm install -g redstonenode-cli
 
 ### Option 2: From Source
 ```bash
-git clone https://github.com/redstone/redstonenode-cli.git
-cd redstonenode-cli
+git clone https://github.com/GopikChenth/RedStoneNode-CLI.git
+cd RedStoneNode-CLI
 npm install
 npm link
 ```
@@ -701,8 +700,8 @@ We welcome contributions! Here's how to get started:
 
 ```bash
 # Clone the repository
-git clone https://github.com/redstone/redstonenode-cli.git
-cd redstonenode-cli
+git clone https://github.com/GopikChenth/RedStoneNode-CLI.git
+cd RedStoneNode-CLI
 
 # Install dependencies
 npm install
@@ -750,8 +749,8 @@ Copyright (c) 2025 RedStone Team
 
 ### Official Links
 - 📦 **NPM Package**: https://www.npmjs.com/package/redstonenode-cli
-- 💻 **GitHub Repository**: https://github.com/redstone/redstonenode-cli
-- 🐛 **Issue Tracker**: https://github.com/redstone/redstonenode-cli/issues
+- 💻 **GitHub Repository**: https://github.com/GopikChenth/RedStoneNode-CLI
+- 🐛 **Issue Tracker**: https://github.com/GopikChenth/RedStoneNode-CLI/issues
 - 📖 **Documentation**: [View README](README.md)
 
 ### Related Resources
@@ -779,10 +778,10 @@ Special thanks to:
 
 ## 📊 Project Stats
 
-![GitHub stars](https://img.shields.io/github/stars/redstone/redstonenode-cli?style=social)
-![GitHub forks](https://img.shields.io/github/forks/redstone/redstonenode-cli?style=social)
+![GitHub stars](https://img.shields.io/github/stars/GopikChenth/RedStoneNode-CLI?style=social)
+![GitHub forks](https://img.shields.io/github/forks/GopikChenth/RedStoneNode-CLI?style=social)
 ![npm downloads](https://img.shields.io/npm/dt/redstonenode-cli)
-![GitHub issues](https://img.shields.io/github/issues/redstone/redstonenode-cli)
+![GitHub issues](https://img.shields.io/github/issues/GopikChenth/RedStoneNode-CLI)
 
 ---
 
@@ -792,6 +791,6 @@ Special thanks to:
 
 **Star ⭐ this repo if you find it helpful!**
 
-[Report Bug](https://github.com/redstone/redstonenode-cli/issues) · [Request Feature](https://github.com/redstone/redstonenode-cli/issues) · [Contribute](CONTRIBUTING.md)
+[Report Bug](https://github.com/GopikChenth/RedStoneNode-CLI/issues) · [Request Feature](https://github.com/GopikChenth/RedStoneNode-CLI/issues) · [Contribute](CONTRIBUTING.md)
 
 </div>
