@@ -1,0 +1,49 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Minecraft server files
+*.jar
+server.properties
+eula.txt
+ops.json
+whitelist.json
+banned-players.json
+banned-ips.json
+usercache.json
+logs/
+world/
+world_nether/
+world_the_end/
+plugins/
+mods/
+libraries/
+versions/
+crash-reports/
+
+# RedStone specific
+.redstone/server.pid
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test files
+test/
+*.test.js
+
+# Environment
+.env
+.env.local
