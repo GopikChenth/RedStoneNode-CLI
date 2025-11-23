@@ -23,7 +23,7 @@
     "android",
     "windows"
   ],
-  "author": "RedStone Team",
+  "author": "Project 47 Labs",
   "license": "MIT",
   "engines": {
     "node": ">=14.0.0"
