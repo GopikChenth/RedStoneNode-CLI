@@ -9,6 +9,17 @@ Cross-platform command-line tool for managing Minecraft Java Edition servers on 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-lightgrey)
 
+## 📦 Quick Install
+
+```bash
+npm install -g redstonenode-cli
+```
+
+Then run:
+```bash
+redstonenode
+```
+
 ## ✨ Features
 
 ### 🚀 Server Management
@@ -137,8 +148,11 @@ pkg update && pkg upgrade
 # Install Node.js
 pkg install nodejs
 
-# Install Java (OpenJDK 17)
-pkg install openjdk-17
+# Install Java 21 (Recommended for MC 1.21+)
+pkg install openjdk-21
+
+# Or install Java 17 (For MC 1.18-1.20)
+# pkg install openjdk-17
 
 # Verify installations
 java -version
