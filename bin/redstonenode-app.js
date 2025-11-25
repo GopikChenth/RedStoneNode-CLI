@@ -58,8 +58,10 @@ async function showMainMenu() {
       name: 'action',
       message: chalk.red('Select action:'),
       choices: [
-        { name: 'Create a Server', value: 'init' },
-        { name: 'List Server', value: 'list' },
+        { name: 'Create new server', value: 'init' },
+        { name: 'List servers', value: 'list' },
+        { name: 'Tunneling Option', value: 'tunnel' },
+        { name: 'Configuration', value: 'config' },
         { name: 'Exit', value: 'exit' }
       ],
       pageSize: 10
@@ -80,6 +82,12 @@ async function main() {
         break;
       case 'list':
         await list.execute();
+        break;
+      case 'tunnel':
+        await tunnel.execute();
+        break;
+      case 'config':
+        await config.execute();
         break;
       case 'exit':
         // Reset terminal formatting before exit

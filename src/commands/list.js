@@ -19,10 +19,32 @@ async function execute() {
   console.log(chalk.blue('📋 Minecraft Servers\n'));
 
   try {
-    const servers = await findAllServers(process.cwd());
+    // Search in multiple locations
+    const searchPaths = [
+      process.cwd(),
+      process.env.HOME || process.env.USERPROFILE,
+      path.join(process.env.HOME || process.env.USERPROFILE, 'minecraft'),
+      path.join(process.env.HOME || process.env.USERPROFILE, 'Documents')
+    ];
+    
+    let servers = [];
+    for (const searchPath of searchPaths) {
+      if (await fs.pathExists(searchPath)) {
+        const found = await findAllServers(searchPath);
+        servers.push(...found);
+      }
+    }
+    
+    // Remove duplicates based on path
+    servers = servers.filter((server, index, self) => 
+      index === self.findIndex((s) => s.path === server.path)
+    );
 
     if (servers.length === 0) {
-      console.log(chalk.yellow('⚠️  No servers found in current directory.'));
+      console.log(chalk.yellow('⚠️  No servers found.'));
+      console.log(chalk.gray(`Searched in:`));
+      console.log(chalk.gray(`  - ${process.cwd()}`));
+      console.log(chalk.gray(`  - ${process.env.HOME || process.env.USERPROFILE}`));
       console.log(chalk.cyan('\n💡 Create a server first using "Create new server".\n'));
       return;
     }
@@ -255,6 +277,23 @@ async function startServer(serverPath) {
   
   const jarFile = jarFiles[0];
   
+  // Clean up session lock files (prevents "already locked" errors)
+  const sessionLockPaths = [
+    path.join(serverPath, 'world', 'session.lock'),
+    path.join(serverPath, 'world_nether', 'session.lock'),
+    path.join(serverPath, 'world_the_end', 'session.lock')
+  ];
+  
+  for (const lockPath of sessionLockPaths) {
+    if (await fs.pathExists(lockPath)) {
+      try {
+        await fs.remove(lockPath);
+      } catch (e) {
+        // Ignore if can't delete
+      }
+    }
+  }
+  
   // Force kill any existing Java processes
   if (process.platform === 'win32') {
     const { execSync } = require('child_process');
@@ -263,6 +302,19 @@ async function startServer(serverPath) {
     try {
       // Kill ALL java.exe processes (most reliable way)
       execSync('taskkill /IM java.exe /F', { stdio: 'ignore' });
+      console.log(chalk.yellow('⚠️  Stopped existing Java processes\n'));
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (e) {
+      // No Java processes found, that's fine
+      console.log(chalk.green('✓ No conflicting processes found\n'));
+    }
+  } else {
+    // On Linux/Termux, kill any Java processes
+    const { execSync } = require('child_process');
+    console.log(chalk.cyan('🔄 Cleaning up previous sessions...\n'));
+    
+    try {
+      execSync('pkill -9 java', { stdio: 'ignore' });
       console.log(chalk.yellow('⚠️  Stopped existing Java processes\n'));
       await new Promise(resolve => setTimeout(resolve, 2000));
     } catch (e) {
@@ -289,6 +341,9 @@ async function startServer(serverPath) {
   
   let serverProcess;
   
+  // Check if running in Termux
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
+  
   // Start server with interactive console window
   if (process.platform === 'win32') {
     serverProcess = spawn('cmd.exe', ['/c', 'start', 'Minecraft Server', scriptPath], {
@@ -296,12 +351,37 @@ async function startServer(serverPath) {
       detached: true,
       stdio: 'ignore'
     });
-  } else {
-    serverProcess = spawn('x-terminal-emulator', ['-e', scriptPath], {
+  } else if (isTermux) {
+    // Termux: Run server in background
+    spinner.text = 'Starting server in background (Termux mode)...';
+    
+    serverProcess = spawn('sh', [scriptPath], {
       cwd: serverPath,
       detached: true,
-      stdio: 'ignore'
+      stdio: ['ignore', 'pipe', 'pipe']
     });
+    
+    // Give server a moment to start
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  } else {
+    // Linux: Try to open terminal emulator
+    try {
+      serverProcess = spawn('x-terminal-emulator', ['-e', scriptPath], {
+        cwd: serverPath,
+        detached: true,
+        stdio: 'ignore'
+      });
+    } catch (e) {
+      // Fallback to background mode
+      console.log(chalk.yellow('\n⚠️  Could not open terminal: Running in background'));
+      console.log(chalk.cyan('💡 View logs: tail -f ' + path.join(serverPath, 'logs', 'latest.log') + '\n'));
+      
+      serverProcess = spawn('sh', [scriptPath], {
+        cwd: serverPath,
+        detached: true,
+        stdio: 'ignore'
+      });
+    }
   }
   
   // Save PID
@@ -310,27 +390,67 @@ async function startServer(serverPath) {
   
   spinner.succeed(chalk.green('Server started!'));
   
+  // Show Termux-specific info after start
+  if (isTermux) {
+    console.log(chalk.cyan('\n📱 Termux Mode:'));
+    console.log(chalk.white('  • Server runs in background (no separate console)'));
+    console.log(chalk.white('  • Logs will be created in: ' + chalk.yellow(path.join(serverPath, 'logs'))));
+    console.log(chalk.white('  • View logs after startup: ' + chalk.yellow('tail -f ' + path.join(serverPath, 'logs', 'latest.log'))));
+    console.log('');
+  }
+  
   // Ask about tunneling
+  const tunnel = require('./tunnel');
+  const defaultService = await tunnel.getDefaultTunnelService();
+  const serviceNames = {
+    playit: 'Playit.gg',
+    ngrok: 'Ngrok',
+    localtunnel: 'LocalTunnel',
+    bore: 'Bore',
+    cloudflared: 'Cloudflared'
+  };
+  
   const { startTunnel } = await inquirer.prompt([
     {
       type: 'confirm',
       name: 'startTunnel',
-      message: 'Create public tunnel with Playit.gg?',
+      message: `Create public tunnel with ${serviceNames[defaultService] || defaultService}? (Recommended for playing with friends)`,
       default: true
     }
   ]);
   
   let tunnelUrl = null;
   if (startTunnel) {
+    console.log(chalk.cyan('\n🌐 Setting up tunnel...\n'));
     tunnelUrl = await setupTunnel(config.port, serverPath);
+    
+    // Debug logging
+    if (tunnelUrl) {
+      console.log(chalk.green(`✅ Tunnel URL captured: ${tunnelUrl}\n`));
+    } else {
+      console.log(chalk.yellow('⚠️  Tunnel started but URL not captured yet\n'));
+      console.log(chalk.gray('The tunnel may still be connecting. Check the tunnel service output above.\n'));
+    }
+    
+    // Save tunnel URL to config
+    if (tunnelUrl) {
+      config.tunnelUrl = tunnelUrl;
+      const configPath = path.join(serverPath, '.redstone', 'config.json');
+      await fs.writeJson(configPath, config, { spaces: 2 });
+    }
   }
   
   // Show server running page
-  await showServerRunningPage(serverPath, config, tunnelUrl);
+  await showServerRunningPage(serverPath, config, tunnelUrl, isTermux);
 }
 
-async function showServerRunningPage(serverPath, config, tunnelUrl = null) {
+async function showServerRunningPage(serverPath, config, tunnelUrl = null, isTermux = false) {
   console.clear();
+  
+  // Load tunnel URL from config if not provided
+  if (!tunnelUrl && config.tunnelUrl) {
+    tunnelUrl = config.tunnelUrl;
+  }
   
   const figlet = require('figlet');
   const banner = figlet.textSync('REDSTONE', {
@@ -340,7 +460,7 @@ async function showServerRunningPage(serverPath, config, tunnelUrl = null) {
   console.log(chalk.red(banner));
   console.log(chalk.gray('                                          v1.0.0\n'));
   
-  console.log(chalk.green('✅ Server Running\n'));
+  console.log(chalk.green('✅ Server Running') + (isTermux ? chalk.yellow(' (Background Mode)') : '') + '\n');
   
   const boxWidth = 58;
   const line = '═'.repeat(boxWidth);
@@ -407,6 +527,34 @@ async function showServerRunningPage(serverPath, config, tunnelUrl = null) {
   switch (action) {
     case 'stop':
       await stopServer(serverPath);
+      
+      // Prompt to return to menu
+      console.log('');
+      await inquirer.prompt([{
+        type: 'input',
+        name: 'continue',
+        message: chalk.gray('Press Enter to return to server menu...')
+      }]);
+      
+      // Reload server info and return to server menu
+      const configPath = path.join(serverPath, '.redstone', 'config.json');
+      if (await fs.pathExists(configPath)) {
+        const updatedConfig = await fs.readJson(configPath);
+        const updatedServerInfo = {
+          name: updatedConfig.serverName,
+          type: updatedConfig.serverType,
+          version: updatedConfig.minecraftVersion,
+          port: updatedConfig.port,
+          ram: updatedConfig.ramAllocation,
+          running: false,
+          path: serverPath
+        };
+        await showServerMenu(serverPath, updatedServerInfo);
+      }
+      break;
+    case 'console':
+      await openConsole(serverPath);
+      await showServerRunningPage(serverPath, config, tunnelUrl, isTermux);
       break;
     case 'back':
       return;
@@ -415,8 +563,41 @@ async function showServerRunningPage(serverPath, config, tunnelUrl = null) {
 
 async function setupTunnel(port, serverPath) {
   const ora = require('ora');
-  const { spawn } = require('child_process');
+  const { spawn, execSync } = require('child_process');
   const https = require('https');
+  const tunnel = require('./tunnel');
+  
+  // Get the default tunnel service
+  const defaultService = await tunnel.getDefaultTunnelService();
+  
+  console.log(chalk.gray(`DEBUG: Using ${defaultService} tunnel service`));
+  
+  // Route to appropriate tunnel service
+  if (defaultService === 'playit') {
+    const url = await setupTunnelPlayit(port, serverPath);
+    console.log(chalk.gray(`DEBUG: Playit returned URL: ${url}`));
+    return url;
+  } else if (defaultService === 'bore') {
+    // Use bore directly (cross-platform)
+    const url = await tunnel.startBore(port, true);
+    console.log(chalk.gray(`DEBUG: Bore returned URL: ${url}`));
+    return url;
+  } else {
+    // Use other automated tunnel services
+    const url = await tunnel.startTunnel(defaultService, port, true);
+    console.log(chalk.gray(`DEBUG: ${defaultService} returned URL: ${url}`));
+    return url;
+  }
+}
+
+async function setupTunnelPlayit(port, serverPath) {
+  const ora = require('ora');
+  const { spawn, execSync } = require('child_process');
+  const https = require('https');
+  
+  // Detect Termux/Android
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
+  const isAndroid = process.platform === 'android' || isTermux;
   
   const playitDir = path.join(process.env.APPDATA || process.env.HOME, '.redstone', 'playit');
   await fs.ensureDir(playitDir);
@@ -428,22 +609,96 @@ async function setupTunnel(port, serverPath) {
     const spinner = ora('Downloading Playit.gg...').start();
     
     try {
-      const downloadUrl = process.platform === 'win32'
-        ? 'https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-windows-x86_64.exe'
-        : process.platform === 'android' || process.env.PREFIX?.includes('com.termux')
-        ? 'https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-arm64'
-        : 'https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64';
-      
-      await downloadFile(downloadUrl, playitExe);
-      
-      if (process.platform !== 'win32') {
-        await fs.chmod(playitExe, '755');
+      // Check for WSL on Termux/Android
+      if (isAndroid) {
+        try {
+          execSync('which wsl', { stdio: 'ignore' });
+          spinner.text = 'Using WSL to download playit...';
+          
+          // Use WSL to download
+          const wslPlayitPath = playitDir.replace(/\\/g, '/');
+          execSync(`wsl bash -c "mkdir -p '${wslPlayitPath}' && cd '${wslPlayitPath}' && wget -q https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-aarch64 -O playit && chmod +x playit"`, { 
+            stdio: 'pipe' 
+          });
+          
+          spinner.succeed(chalk.green('Playit.gg downloaded via WSL'));
+          console.log(chalk.gray(`  Location: ${playitExe}\n`));
+        } catch (wslError) {
+          // WSL not available, try regular download
+          spinner.text = 'Downloading via Node.js...';
+          const downloadUrl = 'https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-aarch64';
+          await downloadFile(downloadUrl, playitExe);
+          await fs.chmod(playitExe, '755');
+          
+          // Verify download
+          if (!await fs.pathExists(playitExe)) {
+            throw new Error('Download completed but file not found');
+          }
+          
+          const stats = await fs.stat(playitExe);
+          if (stats.size < 1000) {
+            throw new Error('Downloaded file is too small (likely incomplete)');
+          }
+          
+          spinner.succeed(chalk.green('Playit.gg downloaded successfully'));
+          console.log(chalk.gray(`  Location: ${playitExe}`));
+          console.log(chalk.gray(`  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB\n`));
+        }
+      } else {
+        // Windows/Linux regular download
+        const downloadUrl = process.platform === 'win32'
+          ? 'https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-windows-x86_64.exe'
+          : 'https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64';
+        
+        spinner.text = 'Downloading from ' + downloadUrl;
+        await downloadFile(downloadUrl, playitExe);
+        
+        // Verify download
+        if (!await fs.pathExists(playitExe)) {
+          throw new Error('Download completed but file not found');
+        }
+        
+        const stats = await fs.stat(playitExe);
+        if (stats.size < 1000) {
+          throw new Error('Downloaded file is too small (likely incomplete)');
+        }
+        
+        if (process.platform !== 'win32') {
+          await fs.chmod(playitExe, '755');
+        }
+        
+        spinner.succeed(chalk.green('Playit.gg downloaded successfully'));
+        console.log(chalk.gray(`  Location: ${playitExe}`));
+        console.log(chalk.gray(`  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB\n`));
       }
-      
-      spinner.succeed(chalk.green('Playit.gg downloaded'));
     } catch (error) {
       spinner.fail(chalk.red('Failed to download Playit.gg'));
-      console.log(chalk.yellow('\n⚠️  Please download manually from: https://playit.gg/download\n'));
+      console.log(chalk.red(`\n❌ Error: ${error.message}\n`));
+      
+      if (isAndroid) {
+        console.log(chalk.yellow('💡 Manual installation for Termux:\n'));
+        console.log(chalk.cyan('Option 1: Direct download'));
+        console.log(chalk.white('  cd ~'));
+        console.log(chalk.white('  mkdir -p .redstone/playit'));
+        console.log(chalk.white('  cd .redstone/playit'));
+        console.log(chalk.white('  wget https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-aarch64'));
+        console.log(chalk.white('  mv playit-linux-aarch64 playit'));
+        console.log(chalk.white('  chmod +x playit'));
+        console.log(chalk.white('  ./playit\n'));
+        
+        console.log(chalk.cyan('Option 2: Use proot-distro (Recommended)'));
+        console.log(chalk.white('  pkg install proot-distro wget -y'));
+        console.log(chalk.white('  proot-distro install ubuntu'));
+        console.log(chalk.white('  proot-distro login ubuntu'));
+        console.log(chalk.white('  # Then inside Ubuntu:'));
+        console.log(chalk.white('  apt update && apt install wget -y'));
+        console.log(chalk.white('  mkdir -p ~/.redstone/playit && cd ~/.redstone/playit'));
+        console.log(chalk.white('  wget https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-aarch64'));
+        console.log(chalk.white('  mv playit-linux-aarch64 playit && chmod +x playit'));
+        console.log(chalk.white('  ./playit\n'));
+      } else {
+        console.log(chalk.yellow('\n⚠️  Download manually from: https://playit.gg/download\n'));
+      }
       return null;
     }
   }
@@ -452,11 +707,65 @@ async function setupTunnel(port, serverPath) {
   const pidFile = path.join(playitDir, 'tunnel.pid');
   const logFile = path.join(playitDir, 'playit-output.log');
 
-  // Start playit process
-  const tunnelProcess = spawn(playitExe, [], {
-    cwd: playitDir,
-    detached: false,
-    stdio: ['ignore', 'pipe', 'pipe']
+  // Verify playit binary exists and is executable
+  try {
+    const stats = await fs.stat(playitExe);
+    if (stats.size < 1000) {
+      spinner.fail(chalk.red('Playit binary is corrupt or incomplete'));
+      console.log(chalk.yellow('\n💡 Try deleting the file and running setup again:\n'));
+      console.log(chalk.white(`  rm ${playitExe}\n`));
+      return null;
+    }
+  } catch (error) {
+    spinner.fail(chalk.red('Playit binary not found'));
+    console.log(chalk.yellow(`\n💡 Expected location: ${playitExe}\n`));
+    return null;
+  }
+
+  // Use WSL to run playit on Android if available
+  let tunnelProcess;
+  let useWSL = false;
+  
+  if (isAndroid) {
+    try {
+      execSync('which wsl', { stdio: 'ignore' });
+      useWSL = true;
+      spinner.text = 'Starting tunnel via WSL...';
+      const wslPlayitPath = playitExe.replace(/\\/g, '/');
+      tunnelProcess = spawn('wsl', ['bash', '-c', `cd '${playitDir.replace(/\\/g, '/')}' && ./playit`], {
+        cwd: playitDir,
+        detached: false,
+        stdio: ['inherit', 'pipe', 'pipe']
+      });
+    } catch (wslError) {
+      // WSL not available, run directly
+      spinner.text = 'Starting tunnel directly...';
+      tunnelProcess = spawn(playitExe, [], {
+        cwd: playitDir,
+        detached: false,
+        stdio: ['inherit', 'pipe', 'pipe']
+      });
+    }
+  } else {
+    // Start playit process normally for Windows/Linux
+    tunnelProcess = spawn(playitExe, [], {
+      cwd: playitDir,
+      detached: false,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+  }
+
+  // Handle process errors
+  tunnelProcess.on('error', (error) => {
+    spinner.fail(chalk.red('Failed to start playit'));
+    console.log(chalk.red(`\n❌ Error: ${error.message}\n`));
+    
+    if (isAndroid && !useWSL) {
+      console.log(chalk.yellow('💡 Try installing WSL in Termux:\n'));
+      console.log(chalk.white('  pkg install proot-distro'));
+      console.log(chalk.white('  proot-distro install ubuntu'));
+      console.log(chalk.white('  proot-distro login ubuntu\n'));
+    }
   });
 
   await fs.writeFile(pidFile, tunnelProcess.pid.toString());
@@ -495,17 +804,59 @@ async function setupTunnel(port, serverPath) {
 
   // Wait for tunnel to establish
   let attempts = 0;
-  while (attempts < 15 && !tunnelUrl) {
+  while (attempts < 20 && !tunnelUrl) {
     await new Promise(resolve => setTimeout(resolve, 1000));
     attempts++;
   }
   
   if (tunnelUrl) {
     spinner.succeed(chalk.green('Tunnel started!'));
+    console.log(chalk.green(`\n🌐 Public Address: ${chalk.white.bold(tunnelUrl)}\n`));
     return tunnelUrl;
   } else {
     spinner.warn(chalk.yellow('Tunnel started (address pending)'));
-    console.log(chalk.cyan('💡 Visit https://playit.gg/account/agents to see your tunnel address\n'));
+    
+    if (isTermux) {
+      console.log(chalk.cyan('\n📱 Termux Tunnel Setup:\n'));
+      console.log(chalk.yellow('⚠️  Playit.gg may need first-time setup.\n'));
+      console.log(chalk.white('1. Open a new Termux session'));
+      console.log(chalk.white('2. Run: ' + chalk.cyan('~/.redstone/playit/playit')));
+      console.log(chalk.white('3. Follow the claim code instructions'));
+      console.log(chalk.white('4. Configure tunnel for Minecraft (port ' + port + ')'));
+      console.log(chalk.white('5. Get your public URL from playit.gg\n'));
+      console.log(chalk.cyan('💡 Or visit: ' + chalk.white('https://playit.gg/account/agents\n')));
+    } else {
+      console.log(chalk.cyan('\n💡 Getting your tunnel address...\n'));
+    }
+    
+    // Try to read from log file if URL not captured
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    try {
+      const logContent = await fs.readFile(logFile, 'utf-8');
+      const patterns = [
+        /([a-z0-9-]+\.gl\.joinmc\.link)/i,
+        /([a-z0-9-]+\.gl\.at\.ply\.gg:\d+)/i,
+        /([a-z0-9-]+\.playit\.gg:\d+)/i,
+        /claim.*?https:\/\/playit\.gg\/claim\/([a-zA-Z0-9-]+)/i
+      ];
+      
+      for (const pattern of patterns) {
+        const match = logContent.match(pattern);
+        if (match && match[1]) {
+          if (pattern.source.includes('claim')) {
+            console.log(chalk.yellow(`\n🔑 First-time setup required!\n`));
+            console.log(chalk.white(`Visit: ${chalk.cyan('https://playit.gg/claim/' + match[1])}\n`));
+          } else {
+            tunnelUrl = match[1];
+            console.log(chalk.green(`🌐 Public Address: ${chalk.white.bold(tunnelUrl)}\n`));
+            return tunnelUrl;
+          }
+        }
+      }
+    } catch (e) {}
+    
+    console.log(chalk.yellow('💡 Visit https://playit.gg/account/agents to see your tunnel address\n'));
+    console.log(chalk.cyan(`📄 Check log: ${logFile}\n`));
     return null;
   }
 }
@@ -593,6 +944,15 @@ async function stopServer(serverPath) {
     await new Promise(resolve => setTimeout(resolve, 2000));
     await fs.remove(pidPath);
     
+    // Clear tunnel URL from config
+    const configPath = path.join(serverPath, '.redstone', 'config.json');
+    if (await fs.pathExists(configPath)) {
+      const config = await fs.readJson(configPath);
+      delete config.tunnelUrl;
+      config.running = false;
+      await fs.writeJson(configPath, config, { spaces: 2 });
+    }
+    
     spinner.succeed(chalk.green('Server stopped!'));
     console.log(chalk.white('✅ Server has been stopped.\n'));
     
@@ -612,6 +972,7 @@ async function openConsole(serverPath) {
   
   const { spawn } = require('child_process');
   const scriptPath = path.join(serverPath, 'start-server' + (process.platform === 'win32' ? '.bat' : '.sh'));
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
   
   if (!await fs.pathExists(scriptPath)) {
     console.log(chalk.red('❌ Server console script not found!\n'));
@@ -624,16 +985,43 @@ async function openConsole(serverPath) {
       detached: true,
       stdio: 'ignore'
     }).unref();
+    console.log(chalk.green('✅ Console window opened!'));
+    console.log(chalk.cyan('💡 You can now type Minecraft commands in the console.\n'));
+  } else if (isTermux) {
+    // Termux: Show log viewing instructions
+    const logsDir = path.join(serverPath, 'logs');
+    const latestLog = path.join(logsDir, 'latest.log');
+    
+    console.log(chalk.yellow('⚠️  Termux does not support separate console windows.\n'));
+    
+    // Check if logs exist
+    if (await fs.pathExists(latestLog)) {
+      console.log(chalk.cyan('📋 View server logs:\n'));
+      console.log(chalk.white('   tail -f ' + latestLog));
+      console.log(chalk.white('   cat ' + latestLog));
+    } else {
+      console.log(chalk.yellow('📋 Logs not yet created. Wait a moment for server to start.\n'));
+      console.log(chalk.cyan('💡 Logs will appear in:\n'));
+      console.log(chalk.white('   ' + logsDir));
+      console.log(chalk.cyan('\n💡 View with: ' + chalk.white('tail -f ' + latestLog)));
+    }
+    
+    console.log(chalk.cyan('\n💡 To send commands, use RCON or stop and restart the server.\n'));
   } else {
-    spawn('x-terminal-emulator', ['-e', scriptPath], {
-      cwd: serverPath,
-      detached: true,
-      stdio: 'ignore'
-    }).unref();
+    try {
+      spawn('x-terminal-emulator', ['-e', scriptPath], {
+        cwd: serverPath,
+        detached: true,
+        stdio: 'ignore'
+      }).unref();
+      console.log(chalk.green('✅ Console window opened!'));
+      console.log(chalk.cyan('💡 You can now type Minecraft commands in the console.\n'));
+    } catch (e) {
+      console.log(chalk.yellow('⚠️  Could not open terminal emulator.\n'));
+      console.log(chalk.cyan('📋 View server logs with:\n'));
+      console.log(chalk.white('   tail -f ' + path.join(serverPath, 'logs', 'latest.log') + '\n'));
+    }
   }
-  
-  console.log(chalk.green('✅ Console window opened!'));
-  console.log(chalk.cyan('💡 You can now type Minecraft commands in the console.\n'));
 }
 
 async function manageWorld(serverPath) {

@@ -153,11 +153,21 @@ async function execute() {
     console.log(chalk.white(`  PID: ${serverProcess.pid}`));
 
     // Ask about tunnel
+    const tunnel = require('./tunnel');
+    const defaultService = await tunnel.getDefaultTunnelService();
+    const serviceNames = {
+      playit: 'Playit.gg',
+      ngrok: 'Ngrok',
+      localtunnel: 'LocalTunnel',
+      bore: 'Bore',
+      cloudflared: 'Cloudflared'
+    };
+    
     const { startTunnel } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'startTunnel',
-        message: 'Create public tunnel with Playit.gg?',
+        message: `Create public tunnel with ${serviceNames[defaultService] || defaultService}?`,
         default: true
       }
     ]);

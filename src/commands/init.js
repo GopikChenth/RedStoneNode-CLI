@@ -41,6 +41,17 @@ async function execute() {
     spinner.succeed(chalk.green(`Java found: ${javaInfo.version}`));
 
     // Prompt for server configuration
+    // Get safe default path (avoid System32 and other restricted directories)
+    let defaultPath = process.cwd();
+    const isRestrictedPath = defaultPath.includes('System32') || 
+                            defaultPath.includes('Windows') || 
+                            defaultPath.includes('Program Files');
+    
+    if (isRestrictedPath) {
+      // Use home directory instead
+      defaultPath = process.env.HOME || process.env.USERPROFILE || process.cwd();
+    }
+    
     const answers = await inquirer.prompt([
       {
         type: 'input',
@@ -56,8 +67,21 @@ async function execute() {
         type: 'input',
         name: 'serverPath',
         message: 'Server directory:',
-        default: process.cwd(),
-        validate: (input) => input.trim() !== ''
+        default: defaultPath,
+        validate: (input) => {
+          if (!input.trim()) return 'Path cannot be empty';
+          
+          // Check for restricted paths
+          const restricted = input.includes('System32') || 
+                           input.includes('Windows') || 
+                           input.includes('Program Files');
+          
+          if (restricted) {
+            return 'Cannot create server in system directories. Use your home directory instead.';
+          }
+          
+          return true;
+        }
       },
       {
         type: 'list',
