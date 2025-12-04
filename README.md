@@ -4,7 +4,7 @@
 
 Cross-platform command-line tool for managing Minecraft Java Edition servers on **Windows**, **Linux**, and **Android (Termux)**.
 
-![Version](https://img.shields.io/badge/version-1.0.0-red)
+![Version](https://img.shields.io/badge/version-1.4.0-red)
 ![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-lightgrey)
@@ -753,6 +753,23 @@ redstonenode
 - 🔄 Backup automation
 - 🐳 Docker support
 
+## 📚 Additional Guides
+
+### Cloud Hosting & Deployment
+- 📖 **[Railway Deployment Guide](RAILWAY-GUIDE.md)** - Deploy to Railway's cloud platform (free $5 credit)
+- ☁️ **[Cloud Proxy Setup Guide](CLOUD-PROXY-GUIDE.md)** - Build Aternos-like proxy with Oracle Cloud (free forever)
+- 🔧 **[Bore Tunnel Setup](BORE-SETUP-GUIDE.md)** - Cross-platform bore installation guide
+- 🚀 **[Quick Start Guide](QUICKSTART.md)** - Get started in 5 minutes
+
+### Deployment Options Comparison
+
+| Platform | Cost | Setup Time | Best For |
+|----------|------|------------|----------|
+| **Playit.gg** | FREE | 2 min | Quick testing |
+| **Railway** | $5 free credit | 15 min | Proxy server |
+| **Oracle Cloud** | FREE forever | 30 min | Production hosting |
+| **Bore Tunnel** | FREE | 5 min | Cross-platform |
+
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
@@ -773,6 +790,8 @@ Copyright (c) 2025 RedStone Team
 - 🧵 **Fabric**: https://fabricmc.net/
 - 🔥 **Forge**: https://files.minecraftforge.net/
 - 🌐 **Playit.gg**: https://playit.gg/
+- 🚂 **Railway**: https://railway.app/
+- ☁️ **Oracle Cloud**: https://cloud.oracle.com/free
 
 ### Community
 - 💬 **Discussions**: GitHub Discussions
@@ -788,6 +807,8 @@ Special thanks to:
 - Figlet for ASCII art
 - PaperMC, Fabric, and Forge teams
 - Playit.gg for tunneling service
+- Railway for cloud platform
+- Oracle Cloud for free tier hosting
 - All contributors and users!
 
 ## 📊 Project Stats

@@ -26,9 +26,9 @@ async function execute() {
   
   console.log(chalk.cyan('🌐 Set Default Tunneling Service\n'));
   console.log(chalk.gray('Select the default tunnel service for all servers:\n'));
-  console.log(chalk.white('  🚀 Bore         - Cross-platform, automated (RECOMMENDED)'));
-  console.log(chalk.white('  🎮 Playit.gg    - Windows/Linux only, automated'));
-  console.log(chalk.white('  ☁️  Cloudflared - Windows/Linux, automated'));
+  console.log(chalk.white('  🎮 Playit.gg    - Free, easy, automated (RECOMMENDED)'));
+  console.log(chalk.white('  ☁️  Cloudflared - Cloudflare Tunnel, automated'));
+  console.log(chalk.white('  🚀 Bore         - Requires manual install (cargo)'));
   console.log(chalk.white('  🌍 Ngrok        - Manual setup required'));
   console.log(chalk.white('  📡 LocalTunnel  - HTTP only (not compatible)\n'));
 
@@ -38,10 +38,10 @@ async function execute() {
     await fs.ensureDir(configDir);
     const configFile = path.join(configDir, 'tunnel-config.json');
     
-    let currentDefault = 'bore';
+    let currentDefault = 'playit';
     if (await fs.pathExists(configFile)) {
       const config = await fs.readJson(configFile);
-      currentDefault = config.defaultService || 'bore';
+      currentDefault = config.defaultService || 'playit';
     }
     
     console.log(chalk.yellow(`Current default: ${currentDefault}\n`));
@@ -53,9 +53,9 @@ async function execute() {
         message: 'Select default tunnel service:',
         default: currentDefault,
         choices: [
-          { name: '🚀 Bore (Recommended - Works everywhere)', value: 'bore' },
-          { name: '🎮 Playit.gg (Windows/Linux only)', value: 'playit' },
-          { name: '☁️  Cloudflared (Windows/Linux)', value: 'cloudflared' },
+          { name: '🎮 Playit.gg (Recommended - Free & Easy)', value: 'playit' },
+          { name: '☁️  Cloudflared (Cloudflare Tunnel)', value: 'cloudflared' },
+          { name: '🚀 Bore (Manual install required)', value: 'bore' },
           { name: '🌍 Ngrok (Manual setup)', value: 'ngrok' },
           { name: '📡 LocalTunnel (Not compatible)', value: 'localtunnel' },
           new inquirer.Separator(),
@@ -89,7 +89,7 @@ async function getDefaultTunnelService() {
   } catch (error) {
     // Return default if config doesn't exist
   }
-  return 'bore';
+  return 'playit';
 }
 
 async function startTunnel(service = 'playit', port = 25565, autoStart = true) {
@@ -232,37 +232,25 @@ async function startBore(port = 25565, autoStart = false) {
   
   // Determine platform and check for bore
   if (isAndroid) {
-    // Try Termux package manager first
-    try {
-      execSync('which bore', { stdio: 'ignore' });
-      boreCommand = 'bore';
+    // First check cargo bin directory (most reliable on Termux)
+    const cargoPath = path.join(process.env.HOME, '.cargo', 'bin', 'bore');
+    if (await fs.pathExists(cargoPath)) {
+      boreCommand = cargoPath;
       boreAvailable = true;
-    } catch {
-      // Try to install via pkg
-      console.log(chalk.yellow('\n⚠️  Bore not installed in Termux\n'));
-      console.log(chalk.cyan('Installing bore via Termux pkg...\n'));
-      
-      const spinner = ora('Installing bore...').start();
+    } else {
+      // Fallback to PATH check
       try {
-        // Install rust and cargo if not present
-        try {
-          execSync('which cargo', { stdio: 'ignore' });
-        } catch {
-          spinner.text = 'Installing rust and cargo...';
-          execSync('pkg install rust -y', { stdio: 'inherit' });
-        }
-        
-        spinner.text = 'Installing bore-cli...';
-        execSync('cargo install bore-cli', { stdio: 'inherit' });
-        
-        spinner.succeed(chalk.green('Bore installed!'));
+        execSync('which bore', { stdio: 'ignore' });
         boreCommand = 'bore';
         boreAvailable = true;
-      } catch (error) {
-        spinner.fail(chalk.red('Failed to install bore'));
-        console.log(chalk.yellow('\n💡 Manual installation:\n'));
-        console.log(chalk.white('  pkg install rust -y'));
-        console.log(chalk.white('  cargo install bore-cli\n'));
+      } catch {
+        console.log(chalk.red('\n❌ Bore not installed in Termux!\n'));
+        console.log(chalk.cyan('To install Bore, run these commands:\n'));
+        console.log(chalk.white('  1. pkg install rust -y'));
+        console.log(chalk.white('  2. cargo install bore-cli'));
+        console.log(chalk.white('  3. Run this CLI again\n'));
+        console.log(chalk.yellow('⏱️  Installation takes 10-15 minutes\n'));
+        console.log(chalk.gray('💡 Alternative: Use Playit.gg (works without installation)\n'));
         return null;
       }
     }
@@ -273,19 +261,13 @@ async function startBore(port = 25565, autoStart = false) {
       boreCommand = boreExe;
       boreAvailable = true;
     } else {
-      const spinner = ora('Downloading bore for Windows...').start();
-      try {
-        const downloadUrl = 'https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-pc-windows-msvc.exe';
-        await downloadFile(downloadUrl, boreExe);
-        spinner.succeed(chalk.green('Bore downloaded'));
-        boreCommand = boreExe;
-        boreAvailable = true;
-      } catch (error) {
-        spinner.fail(chalk.red('Failed to download bore'));
-        console.log(chalk.yellow('\n⚠️  Please install bore manually:\n'));
-        console.log(chalk.white('  Download from: https://github.com/ekzhang/bore/releases\n'));
-        return null;
-      }
+      console.log(chalk.yellow('\n⚠️  Bore not installed\n'));
+      console.log(chalk.cyan('Install Bore manually:\n'));
+      console.log(chalk.white('1. Install Rust: https://rustup.rs'));
+      console.log(chalk.white('2. Run: cargo install bore-cli'));
+      console.log(chalk.white('3. Restart this CLI\n'));
+      console.log(chalk.green('💡 Tip: Use Playit.gg instead for automated setup!\n'));
+      return null;
     }
   } else {
     // Linux
@@ -306,32 +288,156 @@ async function startBore(port = 25565, autoStart = false) {
   
   const spinner = ora('Starting bore tunnel...').start();
   
-  // Start bore process
+  // Start bore process - use inherit for direct output on Android
+  const spawnOptions = isAndroid ? {
+    stdio: 'inherit', // Direct output on Android/Termux
+    shell: true,
+    env: process.env
+  } : {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false,
+    env: process.env
+  };
+  
+  // For Android, run in a way that shows output directly
+  if (isAndroid) {
+    spinner.stop();
+    
+    console.log(chalk.cyan('\n🚀 Starting Bore tunnel...\n'));
+    console.log(chalk.gray('─'.repeat(60)));
+    
+    console.log(chalk.yellow('⏳ Attempting to connect to bore.pub...\n'));
+    
+    // Use direct command without shell to avoid security warning
+    const boreProcess = spawn(boreCommand, 
+      ['local', port.toString(), '--to', 'bore.pub'],
+      {
+        stdio: 'inherit',
+        shell: false, // Don't use shell to avoid security warning
+        env: process.env
+      }
+    );
+    
+    // Wait for bore to start and show output
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    console.log(chalk.gray('─'.repeat(60)));
+    
+    // Check if connection failed
+    console.log(chalk.yellow('\n⚠️  If you see "could not connect" or "timed out" above:'));
+    console.log(chalk.red('   → bore.pub server is currently down or unreachable\n'));
+    console.log(chalk.cyan('💡 Recommended alternatives:\n'));
+    console.log(chalk.white('   1. Use Playit.gg instead (more reliable):'));
+    console.log(chalk.gray('      redstonenode → Tunneling Option → Playit.gg\n'));
+    console.log(chalk.white('   2. Try bore with a different server:'));
+    console.log(chalk.gray('      bore local 25565 --to <custom-server>\n'));
+    console.log(chalk.white('   3. Wait and try bore.pub again later\n'));
+    
+    const inquirer = require('inquirer');
+    const { action } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'action',
+        message: 'What would you like to do?',
+        choices: [
+          { name: '🎮 Switch to Playit.gg (Recommended)', value: 'playit' },
+          { name: '🔄 Try bore.pub again', value: 'retry' },
+          { name: '❌ Cancel tunneling', value: 'cancel' }
+        ]
+      }
+    ]);
+    
+    if (action === 'playit') {
+      boreProcess.kill();
+      console.log(chalk.cyan('\n📍 Switching to Playit.gg...\n'));
+      
+      // Save playit as default
+      const configDir = path.join(process.env.APPDATA || process.env.HOME, '.redstone');
+      await fs.ensureDir(configDir);
+      const configFile = path.join(configDir, 'tunnel-config.json');
+      await fs.writeJson(configFile, { defaultService: 'playit' }, { spaces: 2 });
+      
+      console.log(chalk.green('✅ Default tunnel service changed to Playit.gg'));
+      console.log(chalk.gray('   Please restart your server to use Playit.gg\n'));
+      return null;
+    } else if (action === 'cancel') {
+      boreProcess.kill();
+      console.log(chalk.yellow('\n⚠️  Tunneling cancelled\n'));
+      return null;
+    }
+    
+    // If retry, continue with original flow (though it will likely fail again)
+    console.log(chalk.yellow('\n💡 Look for "listening at bore.pub:XXXXX" in the output above'));
+    console.log(chalk.cyan('📋 If you see it, enter the address below:\n'));
+    
+    const { tunnelUrl } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'tunnelUrl',
+        message: 'Bore tunnel address (or leave empty to cancel):',
+        default: '',
+        validate: (input) => {
+          if (!input || input.trim() === '') {
+            return true; // Allow empty for cancel
+          }
+          if (!input.match(/bore\.pub:\d+/i)) {
+            return 'Invalid format. Should be: bore.pub:12345';
+          }
+          return true;
+        }
+      }
+    ]);
+    
+    if (tunnelUrl && tunnelUrl.trim() && tunnelUrl !== 'bore.pub:') {
+      console.log(chalk.green('\n✅ Bore tunnel configured!'));
+      console.log(chalk.cyan('\n📌 Your public server address:\n'));
+      console.log(chalk.white.bold(`  ${tunnelUrl.trim()}\n`));
+      console.log(chalk.yellow('💡 Share this address with your friends!'));
+      console.log(chalk.gray('📋 The tunnel will stay active while your server runs.\n'));
+      return tunnelUrl.trim();
+    }
+    
+    boreProcess.kill();
+    return null;
+  }
+  
+  // Windows/Linux - capture output programmatically
   const boreProcess = spawn(boreCommand, 
     ['local', port.toString(), '--to', 'bore.pub'],
-    {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: isAndroid // Use shell on Android for better PATH resolution
-    }
+    spawnOptions
   );
   
   let tunnelUrl = '';
+  let outputBuffer = '';
   
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       if (!tunnelUrl) {
         spinner.fail(chalk.red('Timed out waiting for bore tunnel'));
+        console.log(chalk.yellow('\n⚠️  Debug output:\n'));
+        console.log(outputBuffer || 'No output received');
         boreProcess.kill();
         resolve(null);
       }
     }, 15000);
     
-    boreProcess.stdout.on('data', (data) => {
+    const processOutput = (data) => {
       const output = data.toString();
+      outputBuffer += output;
       
-      // Look for the tunnel URL (format: listening at bore.pub:xxxxx)
-      const urlMatch = output.match(/listening at (bore\.pub:\d+)/i);
-      if (urlMatch) {
+      // Log raw output for debugging
+      console.log(chalk.gray(`[BORE] ${output.trim()}`));
+      
+      // Look for the tunnel URL - multiple patterns
+      // Pattern 1: "listening at bore.pub:xxxxx"
+      let urlMatch = output.match(/listening at (bore\.pub:\d+)/i);
+      
+      // Pattern 2: Just "bore.pub:xxxxx" anywhere in output
+      if (!urlMatch) {
+        urlMatch = output.match(/(bore\.pub:\d+)/i);
+      }
+      
+      if (urlMatch && !tunnelUrl) {
         tunnelUrl = urlMatch[1];
         clearTimeout(timeout);
         spinner.succeed(chalk.green('Bore tunnel started!'));
@@ -343,26 +449,10 @@ async function startBore(port = 25565, autoStart = false) {
         
         resolve(tunnelUrl);
       }
-    });
+    };
     
-    boreProcess.stderr.on('data', (data) => {
-      const output = data.toString();
-      if (output.includes('listening at')) {
-        const urlMatch = output.match(/listening at (bore\.pub:\d+)/i);
-        if (urlMatch) {
-          tunnelUrl = urlMatch[1];
-          clearTimeout(timeout);
-          spinner.succeed(chalk.green('Bore tunnel started!'));
-          
-          console.log(chalk.cyan('\n✅ Your public server address:\n'));
-          console.log(chalk.white.bold(`  ${tunnelUrl}\n`));
-          console.log(chalk.yellow('💡 Share this address with your friends!'));
-          console.log(chalk.gray('📋 Keep this program running while playing.\n'));
-          
-          resolve(tunnelUrl);
-        }
-      }
-    });
+    boreProcess.stdout.on('data', processOutput);
+    boreProcess.stderr.on('data', processOutput);
     
     boreProcess.on('error', (error) => {
       clearTimeout(timeout);
@@ -374,13 +464,12 @@ async function startBore(port = 25565, autoStart = false) {
     boreProcess.on('exit', (code) => {
       if (code !== 0 && !tunnelUrl) {
         clearTimeout(timeout);
-        spinner.fail(chalk.red('Bore process exited'));
+        spinner.fail(chalk.red(`Bore process exited with code ${code}`));
+        console.log(chalk.yellow('\n⚠️  Full output:\n'));
+        console.log(outputBuffer || 'No output received');
         resolve(null);
       }
     });
-    
-    // Keep process alive
-    boreProcess.unref();
   });
 }
 

@@ -1,0 +1,48 @@
+name: Keep Railway Service Alive
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  ping-service:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Railway service
+        run: |
+          # Replace with your Railway app URL
+          RAILWAY_URL="${{ secrets.RAILWAY_URL }}"
+          
+          if [ -z "$RAILWAY_URL" ]; then
+            echo "⚠️  RAILWAY_URL secret not set"
+            echo "Add your Railway URL to repository secrets"
+            exit 0
+          fi
+          
+          echo "🏓 Pinging $RAILWAY_URL..."
+          
+          # Try to ping the service
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$RAILWAY_URL" || echo "000")
+          
+          echo "📊 Response code: $HTTP_CODE"
+          
+          if [ "$HTTP_CODE" -eq "000" ]; then
+            echo "⚠️  Service might be down or sleeping"
+          elif [ "$HTTP_CODE" -ge "200" ] && [ "$HTTP_CODE" -lt "400" ]; then
+            echo "✅ Service is alive!"
+          else
+            echo "⚠️  Unexpected response: $HTTP_CODE"
+          fi
+          
+          # Also try TCP connection (Minecraft port)
+          echo ""
+          echo "🔌 Testing TCP connection..."
+          timeout 5 nc -zv $(echo $RAILWAY_URL | sed 's|https\?://||') 25565 || echo "⚠️  TCP port 25565 not responding"
+
+      - name: Update status
+        run: |
+          echo "Last ping: $(date)" >> ping.log
+          echo "Status: OK" >> ping.log
