@@ -760,6 +760,7 @@ redstonenode
 - ☁️ **[Cloud Proxy Setup Guide](CLOUD-PROXY-GUIDE.md)** - Build Aternos-like proxy with Oracle Cloud (free forever)
 - 🔧 **[Bore Tunnel Setup](BORE-SETUP-GUIDE.md)** - Cross-platform bore installation guide
 - 🚀 **[Quick Start Guide](QUICKSTART.md)** - Get started in 5 minutes
+- 📊 **[Hosting Comparison](HOSTING-COMPARISON.md)** - Compare all hosting options and choose the best
 
 ### Deployment Options Comparison
 
