@@ -1,5 +1,43 @@
 # Changelog
 
+## [2.1.0] - 2025-12-04
+
+### 🎉 Major Feature Update
+
+### ✨ New Features
+- 🛑 **Stop Server** - Platform-specific process termination
+  - Windows: WMIC/taskkill for Java processes
+  - Linux/Android: screen/tmux/ps detection and kill
+  - Automatic Playit tunnel cleanup
+- 🌍 **World Management System**
+  - Backup worlds with timestamped archives
+  - Restore from backup list
+  - Export worlds to custom locations
+  - Import worlds from zip files
+  - Safe world deletion
+- ⚙️ **Server Properties Editor**
+  - Edit 12+ properties (max-players, gamemode, difficulty, pvp, whitelist, online-mode, etc.)
+  - Manage OP list with 4 permission levels (1-4)
+  - Whitelist management (add/remove players)
+  - Direct file editing for server.properties, ops.json, whitelist.json
+- 📂 **Custom Directory Selection** - Choose server installation location during creation
+- 🎯 **Platform-Specific Defaults**
+  - Windows: Playit.gg (recommended)
+  - Linux/Android: Bore (lightweight, fast)
+- 📚 **First-Time Tutorial** - Interactive Playit.gg setup guide with visual instructions
+- 🔗 **Enhanced URL Detection** - Support for gl.joinmc.link and joinmc.link formats
+- 🧹 **Clean Output** - Removed debug messages for cleaner UI
+
+### 📦 Dependencies Added
+- archiver@5.3.2 - World backup compression
+- extract-zip@2.0.1 - World restore extraction
+
+### 🐛 Bug Fixes
+- Fixed Playit URL not showing in server info box (gl.joinmc.link pattern)
+- Improved tunnel URL capture reliability
+
+---
+
 ## [2.0.0] - 2025-12-04
 
 ### 🎉 Complete Rebuild

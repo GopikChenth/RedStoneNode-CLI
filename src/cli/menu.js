@@ -1,35 +1,40 @@
 /**
- * Main Menu - Simple and Fast
+ * Main Menu - Follows STRUCTURE.md
  */
 
 const inquirer = require('inquirer');
 const chalk = require('chalk');
-const { listServers } = require('../commands/list');
+const { showServerList } = require('../commands/list');
 const { createServer } = require('../commands/create');
-const { startServer } = require('../commands/start');
 
 async function showMainMenu() {
+  console.log(''); // spacing
+  
   const { action } = await inquirer.prompt([{
     type: 'list',
     name: 'action',
-    message: 'What would you like to do?',
+    message: 'Main Menu',
     choices: [
-      { name: '🎮 Start Server', value: 'start' },
-      { name: '📋 List Servers', value: 'list' },
-      { name: '➕ Create New Server', value: 'create' },
+      { name: '➕ Create new server', value: 'create' },
+      { name: '📋 List servers', value: 'list' },
+      { name: '🌐 Tunneling Option', value: 'tunnel' },
+      { name: '⚙️  Configuration', value: 'config' },
       { name: '❌ Exit', value: 'exit' }
     ]
   }]);
 
   switch (action) {
-    case 'start':
-      await startServer();
-      break;
-    case 'list':
-      await listServers();
-      break;
     case 'create':
       await createServer();
+      break;
+    case 'list':
+      await showServerList();
+      break;
+    case 'tunnel':
+      await showTunnelingOptions();
+      break;
+    case 'config':
+      await showConfiguration();
       break;
     case 'exit':
       console.log(chalk.green('\n👋 Goodbye!\n'));
@@ -38,6 +43,88 @@ async function showMainMenu() {
 
   // Loop back to menu
   await showMainMenu();
+}
+
+async function showTunnelingOptions() {
+  const platform = process.platform;
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
+  
+  console.log(chalk.cyan('\n🌐 Tunneling Options\n'));
+  
+  // Show platform-specific recommendation
+  if (platform === 'win32') {
+    console.log(chalk.gray('💡 Recommended for Windows: ') + chalk.green('Playit.gg'));
+    console.log(chalk.gray('   • Free forever, no time limits'));
+    console.log(chalk.gray('   • Easy setup, reliable connection'));
+    console.log(chalk.gray('   • Custom domains available\n'));
+  } else if (isTermux) {
+    console.log(chalk.gray('💡 Recommended for Termux/Android: ') + chalk.green('Bore'));
+    console.log(chalk.gray('   • Lightweight and fast'));
+    console.log(chalk.gray('   • Works on limited resources'));
+    console.log(chalk.gray('   • No account needed\n'));
+  } else {
+    console.log(chalk.gray('💡 Recommended for Linux: ') + chalk.green('Bore or Playit.gg'));
+    console.log(chalk.gray('   • Both work great on Linux'));
+    console.log(chalk.gray('   • Playit: More features, requires account'));
+    console.log(chalk.gray('   • Bore: Simpler, no account needed\n'));
+  }
+  
+  const { tunnel } = await inquirer.prompt([{
+    type: 'list',
+    name: 'tunnel',
+    message: 'Learn about tunnel services:',
+    choices: [
+      { name: '🎮 Playit.gg (Windows Recommended)', value: 'playit' },
+      { name: '🔧 Bore (Linux/Android Recommended)', value: 'bore' },
+      { name: '🌐 LocalTunnel', value: 'localtunnel' },
+      { name: '⬅️  Back', value: 'back' }
+    ]
+  }]);
+
+  if (tunnel === 'back') return;
+  
+  // Show info about selected tunnel
+  switch (tunnel) {
+    case 'playit':
+      console.log(chalk.cyan('\n🎮 PLAYIT.GG\n'));
+      console.log(chalk.white('Features:'));
+      console.log(chalk.gray('  ✅ Free forever, unlimited bandwidth'));
+      console.log(chalk.gray('  ✅ Reliable addresses (e.g., game-name.gl.joinmc.link)'));
+      console.log(chalk.gray('  ✅ Dashboard to manage tunnels'));
+      console.log(chalk.gray('  ✅ Custom domains (paid)'));
+      console.log(chalk.gray('  ⚠️  Requires account (free sign-up)'));
+      console.log(chalk.gray('\nWebsite: ') + chalk.cyan('https://playit.gg'));
+      break;
+      
+    case 'bore':
+      console.log(chalk.cyan('\n🔧 BORE\n'));
+      console.log(chalk.white('Features:'));
+      console.log(chalk.gray('  ✅ No account needed'));
+      console.log(chalk.gray('  ✅ Lightweight and fast'));
+      console.log(chalk.gray('  ✅ Open source'));
+      console.log(chalk.gray('  ⚠️  Addresses change each time (e.g., bore.pub:54321)'));
+      console.log(chalk.gray('  ⚠️  bore.pub can be unreliable'));
+      console.log(chalk.gray('\nInstall: ') + chalk.cyan('cargo install bore-cli'));
+      console.log(chalk.gray('GitHub: ') + chalk.cyan('https://github.com/ekzhang/bore'));
+      break;
+      
+    case 'localtunnel':
+      console.log(chalk.cyan('\n🌐 LOCALTUNNEL\n'));
+      console.log(chalk.white('Features:'));
+      console.log(chalk.gray('  ✅ No account needed'));
+      console.log(chalk.gray('  ✅ Easy to use'));
+      console.log(chalk.gray('  ⚠️  Can be slower'));
+      console.log(chalk.gray('  ⚠️  Less reliable for Minecraft'));
+      console.log(chalk.gray('\nWebsite: ') + chalk.cyan('https://localtunnel.me'));
+      break;
+  }
+  
+  console.log(chalk.gray('\n💡 Tunnel is selected automatically when you start a server.\n'));
+}
+
+async function showConfiguration() {
+  console.log(chalk.cyan('\n⚙️  Configuration\n'));
+  console.log(chalk.gray('Configuration options coming soon...\n'));
 }
 
 module.exports = { showMainMenu };

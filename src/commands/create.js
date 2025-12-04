@@ -55,10 +55,43 @@ async function createServer() {
       message: 'RAM (MB):',
       default: '1024',
       validate: input => !isNaN(input) || 'Must be a number'
+    },
+    {
+      type: 'list',
+      name: 'locationChoice',
+      message: 'Server location:',
+      choices: [
+        { name: '📁 Default (~/.redstone/servers)', value: 'default' },
+        { name: '📂 Custom directory', value: 'custom' }
+      ]
     }
   ]);
 
-  const serverPath = path.join(getServersDir(), answers.name);
+  let serverPath;
+  
+  if (answers.locationChoice === 'custom') {
+    const { customPath } = await inquirer.prompt([{
+      type: 'input',
+      name: 'customPath',
+      message: 'Enter custom directory path:',
+      default: path.join(require('os').homedir(), 'Desktop', answers.name),
+      validate: input => {
+        if (!input || input.trim().length === 0) {
+          return 'Path cannot be empty';
+        }
+        try {
+          // Check if path is valid
+          path.parse(input);
+          return true;
+        } catch (e) {
+          return 'Invalid path';
+        }
+      }
+    }]);
+    serverPath = customPath;
+  } else {
+    serverPath = path.join(getServersDir(), answers.name);
+  }
   
   // Check if exists
   if (await fs.pathExists(serverPath)) {
@@ -91,10 +124,25 @@ async function createServer() {
       type: answers.type,
       version: answers.version,
       ram: parseInt(answers.ram),
+      path: serverPath,
+      isCustomLocation: answers.locationChoice === 'custom',
       created: new Date().toISOString()
     });
 
-    console.log(chalk.green(`\n✅ Server "${answers.name}" created successfully!\n`));
+    // If custom location, also save a reference in default servers dir
+    if (answers.locationChoice === 'custom') {
+      const defaultServersDir = getServersDir();
+      await fs.ensureDir(defaultServersDir);
+      const linkFile = path.join(defaultServersDir, `${answers.name}.link`);
+      await fs.writeJson(linkFile, {
+        name: answers.name,
+        path: serverPath,
+        created: new Date().toISOString()
+      });
+    }
+
+    console.log(chalk.green(`\n✅ Server "${answers.name}" created successfully!`));
+    console.log(chalk.gray(`   Location: ${serverPath}\n`));
   } catch (error) {
     spinner.fail('Download failed');
     console.error(chalk.red(`\n❌ Error: ${error.message}\n`));
