@@ -401,8 +401,9 @@ async function launchMinecraft(serverPath, config, tunnelUrl) {
   
   await displayServerInfo(serverPath, config, tunnelUrl);
   
-  // Detect platform
+  // Detect platform and Termux
   const platform = process.platform;
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
   const javaCmd = platform === 'win32' ? 'java.exe' : 'java';
 
   // Start server in new window based on platform
@@ -424,8 +425,44 @@ async function launchMinecraft(serverPath, config, tunnelUrl) {
     
     server.unref();
     
+  } else if (isTermux) {
+    // Termux/Android - use setsid (available in Termux by default)
+    console.log(chalk.yellow('\n📱 Termux detected - starting server in background...'));
+    
+    // Try to acquire wake lock to prevent device from sleeping
+    try {
+      spawn('termux-wake-lock', [], { detached: true, stdio: 'ignore' });
+    } catch (e) {
+      console.log(chalk.gray('   (Install termux-api for wake-lock support)'));
+    }
+    
+    // Create a startup script
+    const startScript = path.join(serverPath, 'start-server.sh');
+    await fs.writeFile(startScript, `#!/data/data/com.termux/files/usr/bin/bash\ncd "${serverPath}"\njava -Xmx${config.ram}M -Xms${Math.floor(config.ram / 2)}M -jar server.jar nogui\n`, { mode: 0o755 });
+    
+    // Run in background with setsid
+    server = spawn('setsid', [
+      'bash',
+      startScript
+    ], {
+      cwd: serverPath,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    
+    const logFile = path.join(serverPath, 'server.log');
+    const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+    server.stdout.pipe(logStream);
+    server.stderr.pipe(logStream);
+    
+    server.unref();
+    
+    console.log(chalk.green('✓ Server running in background'));
+    console.log(chalk.gray('  Log file: ') + chalk.cyan('server.log'));
+    console.log(chalk.yellow('\n⚠️  Keep Termux app open in background!'));
+    
   } else {
-    // Linux/Mac/Termux - use screen or tmux if available, otherwise inherit
+    // Linux/Mac - use screen or tmux if available
     const hasScreen = await checkCommand('screen');
     const hasTmux = await checkCommand('tmux');
     
@@ -463,19 +500,50 @@ async function launchMinecraft(serverPath, config, tunnelUrl) {
       server.unref();
       
     } else {
-      // Fallback - run in background with nohup
-      server = spawn('nohup', [
-        'java',
-        `-Xmx${config.ram}M`,
-        `-Xms${Math.floor(config.ram / 2)}M`,
-        '-jar',
-        'server.jar',
-        'nogui'
-      ], {
-        cwd: serverPath,
-        detached: true,
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
+      // Fallback - run in background with nohup or setsid
+      const hasNohup = await checkCommand('nohup');
+      const hasSetsid = await checkCommand('setsid');
+      
+      if (hasNohup) {
+        server = spawn('nohup', [
+          'java',
+          `-Xmx${config.ram}M`,
+          `-Xms${Math.floor(config.ram / 2)}M`,
+          '-jar',
+          'server.jar',
+          'nogui'
+        ], {
+          cwd: serverPath,
+          detached: true,
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+      } else if (hasSetsid) {
+        server = spawn('setsid', [
+          'java',
+          `-Xmx${config.ram}M`,
+          `-Xms${Math.floor(config.ram / 2)}M`,
+          '-jar',
+          'server.jar',
+          'nogui'
+        ], {
+          cwd: serverPath,
+          detached: true,
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+      } else {
+        // Last resort - just spawn detached
+        server = spawn('java', [
+          `-Xmx${config.ram}M`,
+          `-Xms${Math.floor(config.ram / 2)}M`,
+          '-jar',
+          'server.jar',
+          'nogui'
+        ], {
+          cwd: serverPath,
+          detached: true,
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+      }
       
       const logFile = path.join(serverPath, 'server.log');
       const logStream = fs.createWriteStream(logFile, { flags: 'a' });

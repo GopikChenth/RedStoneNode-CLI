@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.1.1] - 2025-12-04
+
+### 🐛 Bug Fixes
+- **Android/Termux Support**: Fixed server startup on Android devices
+  - Added Termux environment detection
+  - Use `setsid` for background processes (available in Termux by default)
+  - No longer requires screen/tmux/nohup installation
+  - Added wake-lock support for termux-api
+  - Creates startup script for reliable execution
+  - Better fallback handling for various Linux environments
+- **Documentation**: Added comprehensive TERMUX-SETUP.md guide
+  - Installation instructions
+  - Battery optimization tips
+  - RAM recommendations for mobile devices
+  - Troubleshooting guide
+
+### 📝 Notes
+If you're on Termux and had issues before, this update should fix them!
+
+---
+
 ## [2.1.0] - 2025-12-04
 
 ### 🎉 Major Feature Update
