@@ -23,10 +23,8 @@
 
 🔧 Tunneling Option
 ├── Playit.gg (Default)
-├── Ngrok
 ├── LocalTunnel
-├── Bore
-└── Cloudflared
+└── Bore
 
 📊 SERVER RUNNING PAGE (showServerRunningPage())
 ├── Server Info Box
