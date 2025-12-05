@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.4] - 2025-12-05
+
+### 🔧 Improvements
+- All improvements from 2.1.3 now fully deployed
+
+---
+
 ## [2.1.3] - 2025-12-05
 
 ### 🐛 Bug Fixes
