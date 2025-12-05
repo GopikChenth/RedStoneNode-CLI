@@ -145,6 +145,15 @@ npm install -g redstonenode-cli --force
 - Disable battery optimization for Termux
 - Keep Termux in foreground or use split-screen
 
+### JNA/udev library warnings
+You may see warnings like:
+```
+[WARN]: Did not find udev library in operating system
+[WARN]: Failed retrieving info for group processor
+```
+
+**These are safe to ignore!** They're just warnings about native libraries not available on Android. The server will work fine.
+
 ### Out of Memory errors
 Reduce RAM allocation in server configuration. Termux has memory limits.
 
@@ -192,12 +201,26 @@ termux-setup-storage
 
 If you chose a custom location during creation (like `/storage/emulated/0/`), check the path shown when the server was created.
 
-### Port already in use
-Check if another server is running:
+### Port already in use (Address already in use)
+This means another Minecraft server is already running on port 25565.
+
+**Fix:**
 ```bash
+# Find the Java process
 ps aux | grep java
-# Kill if needed: kill <pid>
+
+# Kill the process (replace <PID> with the actual number)
+kill <PID>
+
+# Or kill all Java processes
+pkill -9 java
+
+# Then start your server again
 ```
+
+**Prevention:**
+- Always use "⏹️ Stop Server" before starting a new one
+- Check running servers with: `ps aux | grep java`
 
 ## Performance Tips
 

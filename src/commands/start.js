@@ -25,6 +25,30 @@ async function resolveServerPath(serverName) {
   return path.join(serversDir, serverName);
 }
 
+// Check if a port is in use
+async function checkPort(port) {
+  const net = require('net');
+  
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(true); // Port is in use
+      } else {
+        resolve(false);
+      }
+    });
+    
+    server.once('listening', () => {
+      server.close();
+      resolve(false); // Port is available
+    });
+    
+    server.listen(port, '0.0.0.0');
+  });
+}
+
 async function showPlayitTutorial() {
   console.clear();
   console.log(chalk.cyan('╔════════════════════════════════════════════════════════════╗'));
@@ -130,6 +154,34 @@ async function startServer(serverName = null) {
   }]);
 
   console.log(chalk.cyan(`\n🚀 Starting ${serverName}...\n`));
+
+  // Check if port 25565 is already in use
+  const portInUse = await checkPort(25565);
+  if (portInUse) {
+    console.log(chalk.red('❌ Port 25565 is already in use!\n'));
+    console.log(chalk.yellow('Another Minecraft server may be running.\n'));
+    
+    if (isTermux) {
+      console.log(chalk.white('To fix this:\n'));
+      console.log(chalk.cyan('  1. Stop the other server first'));
+      console.log(chalk.cyan('  2. Or use: pkill -9 java'));
+      console.log(chalk.cyan('  3. Then start this server again\n'));
+    } else {
+      console.log(chalk.white('Please stop the other server first or use "Stop Server" option.\n'));
+    }
+    
+    const { forceStart } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'forceStart',
+      message: 'Try to start anyway?',
+      default: false
+    }]);
+    
+    if (!forceStart) {
+      console.log(chalk.yellow('Server start cancelled.\n'));
+      return;
+    }
+  }
 
   // Start tunnel first if needed
   let tunnelUrl = null;
