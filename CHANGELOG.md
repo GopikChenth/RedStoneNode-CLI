@@ -12,6 +12,10 @@
   - Added check to prevent duplicates from .link files
   - Only creates .link files for non-default locations
   - Improved server path resolution
+- **Port Conflict Detection**: Checks if port 25565 is in use before starting
+  - Shows clear error message and solution
+  - Offers option to force start or cancel
+  - Platform-specific troubleshooting instructions
 
 ### ✨ New Features
 - **Android/Termux Shared Storage** (Major improvement!)
