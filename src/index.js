@@ -1,5 +1,5 @@
 /**
- * RedStone CLI v2.4.4 - Main Entry Point
+ * RedStone CLI v2.4.5 - Main Entry Point
  * Lightweight Minecraft server manager
  */
 

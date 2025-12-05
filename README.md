@@ -101,7 +101,7 @@ redstone tutorial
 # RedStone CLI will detect it automatically
 ```
 
-#### Setup Bore (Linux only)
+#### Setup Bore (Linux)
 ```bash
 # Install Rust first
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -110,6 +110,17 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 cargo install bore-cli
 
 # RedStone CLI will use it automatically
+```
+
+#### Setup Bore (Android/Termux)
+```bash
+# Install Rust
+pkg install rust
+
+# Install Bore
+cargo install bore-cli
+
+# RedStone CLI will use it automatically when starting a server
 ```
 
 ---

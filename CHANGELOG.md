@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.5] - 2025-12-05
+
+### 📝 Documentation Updates
+- **README**: Added Bore installation instructions for Android/Termux
+- Simple `pkg install rust` + `cargo install bore-cli` setup
+
+---
+
 ## [2.4.4] - 2025-12-05
 
 ### 📝 Documentation Updates
