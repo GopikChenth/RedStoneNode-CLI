@@ -8,13 +8,35 @@ const { showServerList } = require('../commands/list');
 const { createServer } = require('../commands/create');
 
 async function showMainMenu() {
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
+  
   console.log(''); // spacing
+  
+  // Platform-specific welcome banner
+  if (isTermux) {
+    // Mobile/Termux - compact banner (46 chars)
+    console.log(chalk.cyan('╔════════════════════════════════════════════╗'));
+    console.log(chalk.cyan('║') + chalk.green.bold('       📱 RedStone Mobile v2.4.2         ') + chalk.cyan('║'));
+    console.log(chalk.cyan('╚════════════════════════════════════════════╝'));
+  } else {
+    // PC - full banner
+    console.log(chalk.cyan('╔════════════════════════════════════════╗'));
+    console.log(chalk.cyan('║') + chalk.green.bold('        🎮 RedStone CLI v2.3.3        ') + chalk.cyan('║'));
+    console.log(chalk.cyan('║') + chalk.gray('   Minecraft Server Management Tool   ') + chalk.cyan('║'));
+    console.log(chalk.cyan('╚════════════════════════════════════════╝'));
+  }
   
   const { action } = await inquirer.prompt([{
     type: 'list',
     name: 'action',
-    message: 'Main Menu',
-    choices: [
+    message: isTermux ? 'Menu' : 'Main Menu',
+    choices: isTermux ? [
+      // Mobile - simplified menu
+      { name: '➕ Create', value: 'create' },
+      { name: '📋 Servers', value: 'list' },
+      { name: '❌ Exit', value: 'exit' }
+    ] : [
+      // PC - full menu
       { name: '➕ Create new server', value: 'create' },
       { name: '📋 List servers', value: 'list' },
       { name: '🌐 Tunneling Option', value: 'tunnel' },

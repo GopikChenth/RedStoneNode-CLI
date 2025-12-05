@@ -1,102 +1,223 @@
-# RedStone CLI v2.1
+# 🎮 RedStone CLI
 
-> Fast, lightweight Minecraft server manager
+> Fast, lightweight Minecraft server manager for Windows, Linux, and Android
 
-## 🚀 Quick Start
+[![npm version](https://img.shields.io/npm/v/redstonenode-cli.svg)](https://www.npmjs.com/package/redstonenode-cli)
+[![npm downloads](https://img.shields.io/npm/dm/redstonenode-cli.svg)](https://www.npmjs.com/package/redstonenode-cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+Create and manage Minecraft servers with a simple CLI. Works on PC and Android (Termux). Includes automated tunneling for online play.
+
+---
+
+## 📦 Installation
+
+### Windows / Linux / Mac
 ```bash
 npm install -g redstonenode-cli
 redstone
 ```
 
+### Android (Termux)
+```bash
+# Install dependencies
+pkg update && pkg upgrade
+pkg install nodejs git openjdk-17
+
+# Install RedStone CLI
+npm install -g redstonenode-cli
+
+# Setup storage access
+termux-setup-storage
+
+# Run
+redstone
+```
+
+---
+
+## 🚀 Quick Start
+
+```bash
+# Start interactive menu
+redstone
+
+# Show help
+redstone help
+
+# Show version
+redstone version
+
+# Quick tutorial
+redstone tutorial
+```
+
+**First Time?** Just run `redstone` and follow the prompts to create your first server!
+
+---
+
 ## ✨ Features
 
-### Core
-- ⚡ **Lightning Fast** - Minimal dependencies (~7.2KB compressed)
-- 🎮 **Simple** - Intuitive menu-driven interface
-- 📱 **Cross-Platform** - Windows, Linux, Android (Termux)
-- 🔧 **Zero Config** - Works out of the box
+### 🎯 Core
+- **4 Server Types**: Vanilla, Paper, Fabric, Forge
+- **Multi-Version**: 1.21.4 down to 1.12.2
+- **Easy Management**: Start, stop, configure from one menu
+- **Mobile-Optimized**: Special UI for Android/Termux (46-char width)
+- **Smart RAM**: Shows available memory, input in GB
 
-### Server Management (New in v2.1)
-- 🛑 **Stop Server** - Platform-specific process termination
-  - Windows: WMIC/taskkill
-  - Linux/Android: screen/tmux/ps kill
-- 🌍 **World Management**
-  - 💾 Backup worlds with timestamps
-  - 📦 Restore from backups
-  - 📤 Export to custom locations
-  - 📥 Import from zip files
-  - 🗑️ Delete worlds safely
-- ⚙️ **Server Properties Editor**
-  - Edit 12+ properties (max-players, gamemode, difficulty, pvp, whitelist, etc.)
-  - Manage OP list with 4 permission levels
-  - Whitelist management
-  - Direct file editing
-- 📂 **Custom Directories** - Choose installation location
+### 🌍 World Management
+- Backup/Restore worlds with timestamps
+- Export worlds to custom locations
+- Import worlds from zip files
+- Delete worlds safely
 
-### Networking
-- 🌐 **Tunneling Services** - Playit.gg, Bore, LocalTunnel
-- 🔗 **Smart URL Detection** - gl.joinmc.link, joinmc.link, playit.gg
-- 🎯 **Platform Defaults**
-  - Windows → Playit.gg
-  - Linux/Android → Bore
-- 📚 **First-Time Tutorial** - Interactive Playit.gg setup guide
+### ⚙️ Server Configuration
+- Edit server properties (gamemode, difficulty, max-players, PvP, etc.)
+- OP list management (4 permission levels)
+- Whitelist management
+- Direct file editing
 
-## 📦 Supported Server Types
+### 🌐 Online Play (Tunneling)
 
-- Vanilla
-- Paper (Recommended)
-- Fabric
-- Forge
+**⚠️ IMPORTANT: You need a broadband connection (not mobile data) for port forwarding to work!**
 
-## 🎯 Usage
+| Platform | Tunnel | Status |
+|----------|--------|--------|
+| **Windows** | Playit.gg | ✅ Recommended |
+| **Windows** | Bore | ❌ Not supported |
+| **Linux** | Playit.gg | ✅ Works |
+| **Linux** | Bore | ✅ Works |
+| **Android/Termux** | Bore | ⚠️ Unreliable (bore.pub issues) |
+| **Android/Termux** | Playit.gg | ❌ Not supported (ARM64 issues) |
 
-### Create Server
+**Mobile ISPs block port forwarding** - You MUST use home WiFi/broadband for online servers!
+
+#### Setup Playit.gg (Windows/Linux)
 ```bash
-redstone
-# Select "Create New Server"
-# Choose type, version, and RAM
+# Download from https://playit.gg
+# Run the installer
+# Create account and claim tunnel
+# RedStone CLI will detect it automatically
 ```
 
-### Start Server
+#### Setup Bore (Linux only)
 ```bash
-redstone
-# Select "Start Server"
-# Choose server from list
-# Optional: Enable Playit.gg tunnel
+# Install Rust first
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install Bore
+cargo install bore-cli
+
+# RedStone CLI will use it automatically
 ```
 
-### List Servers
+---
+
+## 📱 Platform-Specific Notes
+
+### Windows
+- ✅ Full feature support
+- ✅ Playit.gg recommended for tunneling
+- 📁 Servers stored in: `C:\Users\<user>\.redstone\servers\`
+
+### Linux / Mac
+- ✅ Full feature support
+- ✅ Playit.gg or Bore for tunneling
+- 📁 Servers stored in: `~/.redstone/servers/`
+
+### Android (Termux)
+- ✅ Optimized mobile UI
+- ✅ Shared storage support: `/storage/emulated/0/Documents/RedStone-Servers/`
+- ⚠️ Bore tunneling unreliable (service issues)
+- ⚠️ Keep Termux awake with `termux-wake-lock`
+- ⚠️ Requires broadband connection (not mobile data)
+- ⚠️ Some modded servers may not work on ARM architecture
+
+---
+
+## 🎮 Usage Examples
+
+### Create a Server
 ```bash
 redstone
-# Select "List Servers"
+# Select: Create
+# Choose: Paper (recommended)
+# Version: 1.21.4
+# RAM: 2GB (shows your available RAM)
+# Location: Shared Storage (Android) or Default
 ```
 
-## 💾 Data Location
+### Start & Share Online
+```bash
+redstone
+# Select: Servers
+# Choose your server
+# Select: Start Server
+# Share the tunnel address with friends
+# Example: game-name.gl.joinmc.link:25565
+```
 
-All servers stored in: `~/.redstone/servers/`
+### Manage Server
+```bash
+redstone
+# Select: Servers
+# Choose your server
+# Options:
+#   - Server Properties (edit settings)
+#   - World Management (backup/restore)
+#   - Stop Server (safe shutdown)
+#   - View Logs (check output)
+```
 
-## 📋 Changelog
+---
 
-### v2.1.0 (Latest)
-- ✅ Stop Server functionality with platform-specific process termination
-- ✅ Complete World Management system (Backup/Restore/Export/Import/Delete)
-- ✅ Server Properties Editor with OP and Whitelist management
-- ✅ Custom directory selection during server creation
-- ✅ Platform-specific tunnel defaults (Windows: Playit, Linux/Android: Bore)
-- ✅ First-time Playit.gg setup tutorial
-- ✅ Enhanced URL detection (gl.joinmc.link format support)
-- ✅ Clean output (removed debug messages)
+## 🔧 Troubleshooting
 
-### v2.0.0
-- Complete rebuild for speed and efficiency
-- Minimal dependencies, maximum performance
-- Playit.gg automatic tunneling
-- Cross-platform support
+### "Can't connect to server"
+- ✅ Verify you're on broadband (not mobile data)
+- ✅ Check firewall settings
+- ✅ Ensure tunnel is running
+- ✅ Use correct address (including port)
+
+### "Bore connection timeout"
+- ⚠️ bore.pub servers are often down
+- ✅ Try Playit.gg instead (if on PC)
+- ✅ Check internet connection
+
+### Android: "Server won't start"
+- ✅ Keep Termux awake: `termux-wake-lock`
+- ✅ Check Java installed: `java -version`
+- ✅ Verify RAM available: 2GB+ recommended
+- ✅ Some mods incompatible with ARM
+
+---
+
+## 📋 Commands
+
+| Command | Description |
+|---------|-------------|
+| `redstone` | Start interactive menu |
+| `redstone help` | Show help message |
+| `redstone version` | Show version |
+| `redstone tutorial` | Quick start guide |
+
+---
+
+## 🛠️ Requirements
+
+- **Node.js** 14.0.0 or higher
+- **Java** 17+ (for Minecraft 1.18+) or Java 8+ (older versions)
+- **RAM**: 2GB+ recommended for smooth gameplay
+- **Internet**: Broadband connection required for online play
+
+---
 
 ## 📝 License
 
 MIT © RedStone Team
+
+**Support**: [GitHub Issues](https://github.com/GopikChenth/RedStoneNode-CLI/issues)  
+**NPM**: [redstonenode-cli](https://www.npmjs.com/package/redstonenode-cli)
 
 ## 🔗 Links
 

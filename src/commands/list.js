@@ -170,17 +170,24 @@ async function showServerList() {
         // Regular server in default location
         const configPath = path.join(itemPath, 'redstone.json');
         if (await fs.pathExists(configPath)) {
-          // Check if this server is already in the list (from .link file)
-          if (!serverPaths.has(item)) {
+          try {
             const config = await fs.readJson(configPath);
-            servers.push({
-              name: item,
-              type: config.type || 'Unknown',
-              version: config.version || 'Unknown',
-              ram: config.ram || 1024,
-              status: 'Stopped' // TODO: Check if actually running
-            });
-            serverPaths.set(item, itemPath);
+            const serverName = config.name || item;
+            
+            // Check if this server is already in the list (from .link file or duplicate folder)
+            if (!serverPaths.has(item) && !serverPaths.has(serverName)) {
+              servers.push({
+                name: item,
+                type: config.type || 'Unknown',
+                version: config.version || 'Unknown',
+                ram: config.ram || 1024,
+                status: 'Stopped' // TODO: Check if actually running
+              });
+              serverPaths.set(item, itemPath);
+              serverPaths.set(serverName, itemPath); // Also track by config name
+            }
+          } catch (e) {
+            // Invalid config, skip
           }
         }
       }
@@ -194,22 +201,36 @@ async function showServerList() {
     return;
   }
 
-  // Display table
-  console.log(chalk.cyan('\n📋 SERVER LIST\n'));
-  console.log(chalk.gray('┌────────────────────┬──────────┬──────────┬──────────┬────────┐'));
-  console.log(chalk.gray('│ Name               │ Type     │ Version  │ Status   │ RAM    │'));
-  console.log(chalk.gray('├────────────────────┼──────────┼──────────┼──────────┼────────┤'));
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
   
-  servers.forEach(server => {
-    const name = server.name.padEnd(18).substring(0, 18);
-    const type = server.type.padEnd(8).substring(0, 8);
-    const version = server.version.padEnd(8).substring(0, 8);
-    const status = server.status.padEnd(8);
-    const ram = `${server.ram}M`.padEnd(6);
-    console.log(`│ ${name} │ ${type} │ ${version} │ ${status} │ ${ram} │`);
-  });
-  
-  console.log(chalk.gray('└────────────────────┴──────────┴──────────┴──────────┴────────┘\n'));
+  // Display table - different layouts for mobile vs PC
+  if (isTermux) {
+    // Mobile - compact vertical list
+    console.log(chalk.cyan('\n📋 SERVERS\n'));
+    servers.forEach((server, i) => {
+      console.log(chalk.cyan(`${i + 1}. ${server.name}`));
+      console.log(chalk.gray(`   ${server.type} ${server.version} • ${(server.ram / 1024).toFixed(1)}GB`));
+      if (i < servers.length - 1) console.log('');
+    });
+    console.log('');
+  } else {
+    // PC - full table
+    console.log(chalk.cyan('\n📋 SERVER LIST\n'));
+    console.log(chalk.gray('┌────────────────────┬──────────┬──────────┬──────────┬────────┐'));
+    console.log(chalk.gray('│ Name               │ Type     │ Version  │ Status   │ RAM    │'));
+    console.log(chalk.gray('├────────────────────┼──────────┼──────────┼──────────┼────────┤'));
+    
+    servers.forEach(server => {
+      const name = server.name.padEnd(18).substring(0, 18);
+      const type = server.type.padEnd(8).substring(0, 8);
+      const version = server.version.padEnd(8).substring(0, 8);
+      const status = server.status.padEnd(8);
+      const ram = `${server.ram}M`.padEnd(6);
+      console.log(`│ ${name} │ ${type} │ ${version} │ ${status} │ ${ram} │`);
+    });
+    
+    console.log(chalk.gray('└────────────────────┴──────────┴──────────┴──────────┴────────┘\n'));
+  }
 
   // Select server
   const choices = servers.map(s => ({ name: s.name, value: s.name }));
@@ -250,14 +271,14 @@ async function showServerMenu(serverName, serverPath) {
     name: 'action',
     message: 'What would you like to do?',
     choices: [
-      { name: '▶️  Start Server', value: 'start' },
-      { name: '⏹️  Stop Server', value: 'stop' },
-      { name: '📜 View Logs', value: 'logs' },
-      { name: '🌍 World Management', value: 'world' },
-      { name: '⚙️  Server Properties', value: 'properties' },
-      { name: '📁 Open Files', value: 'files' },
-      { name: '🗑️  Delete Server', value: 'delete' },
-      { name: '⬅️  Back to List', value: 'back' }
+      { name: '▶️   Start Server', value: 'start' },
+      { name: '⏹️   Stop Server', value: 'stop' },
+      { name: '📜  View Logs', value: 'logs' },
+      { name: '🌍  World Management', value: 'world' },
+      { name: '⚙️   Server Properties', value: 'properties' },
+      { name: '📁  Open Files', value: 'files' },
+      { name: '🗑️   Delete Server', value: 'delete' },
+      { name: '⬅️   Back to List', value: 'back' }
     ]
   }]);
 
@@ -369,7 +390,9 @@ async function stopServer(serverName, serverPath) {
       }
       
     } else {
-      // Linux/Mac - kill screen/tmux session or find java process
+      // Linux/Mac/Android - kill screen/tmux session or find java process
+      const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
+      
       try {
         // Try screen first
         await execPromise('screen -S minecraft -X quit');
@@ -382,13 +405,46 @@ async function stopServer(serverName, serverPath) {
         } catch (tmuxError) {
           // Try finding java process
           try {
-            const { stdout } = await execPromise(`ps aux | grep "java.*${serverPath}" | grep -v grep`);
+            // On Android/Termux, look for any java process running server.jar
+            let grepCommand;
+            if (isTermux) {
+              // Simpler search on Android - just find java with server.jar
+              grepCommand = 'ps aux | grep "java.*server.jar" | grep -v grep';
+            } else {
+              // On Linux/Mac, try to match the specific server path
+              grepCommand = `ps aux | grep "java.*${serverPath}" | grep -v grep`;
+            }
+            
+            const { stdout } = await execPromise(grepCommand);
             const lines = stdout.split('\n').filter(line => line.trim());
             
             if (lines.length > 0) {
-              const pid = lines[0].split(/\s+/)[1];
-              await execPromise(`kill ${pid}`);
-              console.log(chalk.green(`\n✅ Server "${serverName}" stopped\n`));
+              // Kill all matching java processes
+              let killed = false;
+              for (const line of lines) {
+                const parts = line.split(/\s+/);
+                const pid = parts[1];
+                if (pid && !isNaN(pid)) {
+                  try {
+                    await execPromise(`kill ${pid}`);
+                    killed = true;
+                    console.log(chalk.green(`✅ Stopped process ${pid}`));
+                  } catch (e) {
+                    // Process might already be dead
+                  }
+                }
+              }
+              
+              if (killed) {
+                // Also try to kill Bore if running
+                try {
+                  await execPromise('pkill bore');
+                } catch (e) {}
+                
+                console.log(chalk.green(`\n✅ Server "${serverName}" stopped\n`));
+              } else {
+                console.log(chalk.yellow('⚠️  No running server found\n'));
+              }
             } else {
               console.log(chalk.yellow('⚠️  No running server found\n'));
             }

@@ -1,4 +1,4 @@
-# Termux/Android Setup Guide
+ it # Termux/Android Setup Guide
 
 ## Prerequisites
 
@@ -125,8 +125,60 @@ bore --version
 
 **Note**: Bore compilation requires ~500MB free RAM. If it fails, close other apps and try again.
 
-### Playit.gg (Alternative)
-Playit.gg also works on Termux but requires more setup.
+### ⚠️ Bore Connection Issues
+
+If you get a Bore address but can't connect:
+
+1. **Check if Bore is still running:**
+```bash
+ps aux | grep bore
+```
+
+2. **Test the Bore connection:**
+```bash
+# Replace XXXXX with your port number
+nc -zv bore.pub XXXXX
+```
+
+3. **Common Issues:**
+- **bore.pub is unreliable** - connections can drop randomly
+- **Network restrictions** - some ISPs/networks block tunneling
+- **Bore process died** - check with `ps aux | grep bore`
+
+4. **Solution: Use Playit instead** (more reliable)
+```bash
+# Playit works better but requires browser setup
+# See PLAYIT-SETUP.md for full guide
+```
+
+### Playit.gg (Recommended - More Reliable) ⭐
+
+**Playit is now fully supported on Termux!** It's much more reliable than Bore.
+
+**Setup:**
+1. When starting a server, choose "Playit.gg" option
+2. Playit will download automatically (~10-15MB)
+3. A claim URL will appear (like `https://playit.gg/claim/ABC123`)
+4. Open the URL in your phone browser
+5. Sign in and click "Claim Agent"
+6. Restart your server - you'll get a public address!
+
+**Advantages over Bore:**
+- ✅ Actually works through most networks
+- ✅ More stable connections
+- ✅ Better performance
+- ✅ Free dashboard to manage tunnels
+- ✅ Automatic reconnection if dropped
+
+**Usage:**
+```bash
+redstone
+# Choose "Start Server"
+# Choose "Playit.gg (Recommended)"
+# Follow the browser setup
+```
+
+See full guide: `PLAYIT-SETUP.md`
 
 ## Troubleshooting
 

@@ -80,9 +80,19 @@ async function showPlayitTutorial() {
   
   console.log(chalk.cyan('💡 TIPS:'));
   console.log(chalk.gray('• Free forever - no credit card needed'));
-  console.log(chalk.gray('• Keep the Playit window open while server runs'));
+  console.log(chalk.gray('• Keep Termux/terminal open while server runs'));
   console.log(chalk.gray('• Share the public address with friends'));
   console.log(chalk.gray('• Dashboard: ') + chalk.cyan('https://playit.gg/account/agents'));
+  
+  const isTermux = (process.env.PREFIX && process.env.PREFIX.includes('com.termux')) || 
+                   fs.existsSync('/data/data/com.termux');
+  if (isTermux) {
+    console.log('');
+    console.log(chalk.yellow('📱 ANDROID/TERMUX NOTES:'));
+    console.log(chalk.gray('• Open claim URL in your phone browser'));
+    console.log(chalk.gray('• Keep Termux in foreground or use split-screen'));
+    console.log(chalk.gray('• Disable battery optimization for Termux'));
+  }
   console.log('');
   
   await inquirer.prompt([{
@@ -140,6 +150,15 @@ async function startServer(serverName = null) {
   const serverPath = await resolveServerPath(serverName);
   const config = await fs.readJson(path.join(serverPath, 'redstone.json'));
 
+  // Check server version and show warning if needed
+  console.log(chalk.cyan(`\n🎮 Server: ${config.name || serverName}`));
+  console.log(chalk.gray(`   Type: ${config.type} ${config.version}`));
+  
+  if (config.version) {
+    console.log(chalk.yellow(`\n⚠️  Make sure your Minecraft client version matches: ${config.version}`));
+    console.log(chalk.gray(`   If versions don't match, you'll see "Outdated client/server" error\n`));
+  }
+
   // Determine recommended tunnel service based on platform
   const platform = process.platform;
   const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
@@ -155,39 +174,93 @@ async function startServer(serverName = null) {
 
   console.log(chalk.cyan(`\n🚀 Starting ${serverName}...\n`));
 
-  // Check if port 25565 is already in use
+  // Check if port 25565 is already in use and auto-kill
   const portInUse = await checkPort(25565);
   if (portInUse) {
-    console.log(chalk.red('❌ Port 25565 is already in use!\n'));
-    console.log(chalk.yellow('Another Minecraft server may be running.\n'));
+    console.log(chalk.yellow('⚠️  Port 25565 is already in use'));
+    console.log(chalk.cyan('🔄 Stopping existing server...\n'));
     
-    if (isTermux) {
-      console.log(chalk.white('To fix this:\n'));
-      console.log(chalk.cyan('  1. Stop the other server first'));
-      console.log(chalk.cyan('  2. Or use: pkill -9 java'));
-      console.log(chalk.cyan('  3. Then start this server again\n'));
-    } else {
-      console.log(chalk.white('Please stop the other server first or use "Stop Server" option.\n'));
-    }
-    
-    const { forceStart } = await inquirer.prompt([{
-      type: 'confirm',
-      name: 'forceStart',
-      message: 'Try to start anyway?',
-      default: false
-    }]);
-    
-    if (!forceStart) {
-      console.log(chalk.yellow('Server start cancelled.\n'));
-      return;
+    try {
+      const { exec } = require('child_process');
+      const util = require('util');
+      const execPromise = util.promisify(exec);
+      
+      if (process.platform === 'win32') {
+        // Windows - aggressive kill
+        try {
+          await execPromise('taskkill /F /IM java.exe');
+        } catch (e) {
+          // Try wmic if taskkill fails
+          await execPromise('wmic process where "name=\'java.exe\'" delete');
+        }
+      } else {
+        // Linux/Mac/Android - multiple kill attempts
+        try {
+          // First try graceful kill
+          await execPromise('pkill java');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (e) {}
+        
+        // Then force kill
+        try {
+          await execPromise('pkill -9 java');
+        } catch (e) {}
+        
+        // On Android, also try killall
+        if (isTermux) {
+          try {
+            await execPromise('killall -9 java');
+          } catch (e) {}
+        }
+      }
+      
+      // Wait longer for process cleanup
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Check if port is now free
+      const stillInUse = await checkPort(25565);
+      if (stillInUse) {
+        console.log(chalk.red('⚠️  Port still in use - trying to start anyway...\n'));
+      } else {
+        console.log(chalk.green('✅ Port freed successfully\n'));
+      }
+    } catch (error) {
+      // Continue anyway
+      console.log(chalk.gray('Attempting to start server...\n'));
     }
   }
 
   // Start tunnel first if needed
   let tunnelUrl = null;
   if (useTunnel) {
-    // Check if first time using Playit on Windows
-    if (platform === 'win32') {
+    if (isTermux) {
+      // Android/Termux - Ask user to choose tunnel
+      const { tunnelChoice } = await inquirer.prompt([{
+        type: 'list',
+        name: 'tunnelChoice',
+        message: 'Choose tunnel service:',
+        choices: [
+          { name: '🌐 Playit.gg (Recommended - More Reliable)', value: 'playit' },
+          { name: '🔧 Bore (Simpler - May Not Work)', value: 'bore' },
+          { name: '🚫 Skip Tunnel (Local Network Only)', value: 'none' }
+        ]
+      }]);
+      
+      if (tunnelChoice === 'playit') {
+        const os = require('os');
+        const playitDir = path.join(os.homedir(), '.redstone', 'playit');
+        const playitExists = await fs.pathExists(playitDir);
+        
+        if (!playitExists) {
+          await showPlayitTutorial();
+        }
+        
+        tunnelUrl = await startTunnel(serverPath);
+      } else if (tunnelChoice === 'bore') {
+        tunnelUrl = await startBoreTunnel();
+      }
+    } else if (platform === 'win32') {
+      // Windows - use Playit
       const os = require('os');
       const playitDir = path.join(os.homedir(), '.redstone', 'playit');
       const playitExists = await fs.pathExists(playitDir);
@@ -198,13 +271,13 @@ async function startServer(serverName = null) {
       
       tunnelUrl = await startTunnel(serverPath);
     } else {
-      // Use Bore for Linux/Android/Termux
+      // Linux/Mac - use Bore
       tunnelUrl = await startBoreTunnel();
     }
   }
 
-  // Start Minecraft server
-  await launchMinecraft(serverPath, config, tunnelUrl);
+  // Start Minecraft server FIRST (before tunnel)
+  await launchMinecraft(serverPath, config, tunnelUrl, useTunnel);
 }
 
 async function startTunnel(serverPath) {
@@ -478,8 +551,8 @@ async function launchMinecraft(serverPath, config, tunnelUrl) {
     server.unref();
     
   } else if (isTermux) {
-    // Termux/Android - use setsid (available in Termux by default)
-    console.log(chalk.yellow('\n📱 Termux detected - starting server in background...'));
+    // Termux/Android - direct Java execution without setsid (simpler, works better)
+    console.log(chalk.yellow('\n📱 Starting server on Android...'));
     
     // Try to acquire wake lock to prevent device from sleeping
     try {
@@ -488,30 +561,37 @@ async function launchMinecraft(serverPath, config, tunnelUrl) {
       console.log(chalk.gray('   (Install termux-api for wake-lock support)'));
     }
     
-    // Create a startup script
-    const startScript = path.join(serverPath, 'start-server.sh');
-    await fs.writeFile(startScript, `#!/data/data/com.termux/files/usr/bin/bash\ncd "${serverPath}"\njava -Xmx${config.ram}M -Xms${Math.floor(config.ram / 2)}M -jar server.jar nogui\n`, { mode: 0o755 });
-    
-    // Run in background with setsid
-    server = spawn('setsid', [
-      'bash',
-      startScript
+    // Run Java directly in background
+    server = spawn('java', [
+      `-Xmx${config.ram}M`,
+      `-Xms${Math.floor(config.ram / 2)}M`,
+      '-jar',
+      'server.jar',
+      'nogui'
     ], {
       cwd: serverPath,
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe']
     });
     
-    const logFile = path.join(serverPath, 'server.log');
+    const logFile = path.join(serverPath, 'logs', 'latest.log');
     const logStream = fs.createWriteStream(logFile, { flags: 'a' });
     server.stdout.pipe(logStream);
     server.stderr.pipe(logStream);
     
     server.unref();
     
-    console.log(chalk.green('✓ Server running in background'));
-    console.log(chalk.gray('  Log file: ') + chalk.cyan('server.log'));
+    console.log(chalk.green('✓ Server started'));
+    console.log(chalk.gray('  Check logs in: ') + chalk.cyan('logs/latest.log'));
     console.log(chalk.yellow('\n⚠️  Keep Termux app open in background!'));
+    
+    if (tunnelUrl && tunnelUrl.includes('bore.pub')) {
+      console.log(chalk.cyan('\n📋 Troubleshooting Bore Connection:'));
+      console.log(chalk.gray('  1. Check if Bore is running: ') + chalk.white('ps aux | grep bore'));
+      console.log(chalk.gray('  2. Test connection: ') + chalk.white(`nc -zv bore.pub ${tunnelUrl.split(':')[1] || '25565'}`));
+      console.log(chalk.gray('  3. Bore can be unreliable - consider using Playit instead'));
+      console.log(chalk.gray('     Install: ') + chalk.cyan('npm install -g playit-cli'));
+    }
     
   } else {
     // Linux/Mac - use screen or tmux if available
@@ -623,58 +703,116 @@ async function displayServerInfo(serverPath, config, tunnelUrl) {
   // Clear screen and show server running page
   console.clear();
   
-  // Box width calculation
-  const boxWidth = 60;
-  const line = '═'.repeat(boxWidth);
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
   
-  // ASCII Art Banner (like v1.5)
-  console.log(chalk.cyan(`╔${line}╗`));
-  console.log(chalk.cyan('║') + chalk.green.bold(' '.repeat(18) + '🎮 SERVER RUNNING' + ' '.repeat(24)) + chalk.cyan('║'));
-  console.log(chalk.cyan(`╚${line}╝`));
-  console.log('');
-  
-  // Server Info Box (like v1.5)
-  console.log(chalk.cyan(`╔${line}╗`));
-  console.log(chalk.cyan('║  ') + chalk.white.bold('SERVER INFORMATION') + ' '.repeat(boxWidth - 20) + chalk.cyan('║'));
-  console.log(chalk.cyan(`╠${line}╣`));
-  console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
-  console.log(chalk.cyan('║  ') + chalk.gray('Name: ') + chalk.white(config.name) + ' '.repeat(boxWidth - 8 - config.name.length) + chalk.cyan('║'));
-  console.log(chalk.cyan('║  ') + chalk.gray('Type: ') + chalk.white(`${config.type} ${config.version}`) + ' '.repeat(Math.max(0, boxWidth - 8 - config.type.length - config.version.length)) + chalk.cyan('║'));
-  console.log(chalk.cyan('║  ') + chalk.gray('RAM:  ') + chalk.white(`${config.ram}MB`) + ' '.repeat(boxWidth - 8 - config.ram.toString().length - 2) + chalk.cyan('║'));
-  
-  // Show directory path (truncate if too long)
-  const displayPath = serverPath.length > 50 ? '...' + serverPath.slice(-47) : serverPath;
-  const pathPadding = Math.max(0, boxWidth - 8 - displayPath.length);
-  console.log(chalk.cyan('║  ') + chalk.gray('Path: ') + chalk.white(displayPath) + ' '.repeat(pathPadding) + chalk.cyan('║'));
-  
-  console.log(chalk.cyan('║  ') + chalk.gray('Status: ') + chalk.green('● Running') + ' '.repeat(boxWidth - 18) + chalk.cyan('║'));
-  console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
-  console.log(chalk.cyan(`╠${line}╣`));
-  console.log(chalk.cyan('║  ') + chalk.white.bold('SERVER ADDRESSES') + ' '.repeat(boxWidth - 18) + chalk.cyan('║'));
-  console.log(chalk.cyan(`╠${line}╣`));
-  console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
-  
-  // Connection Addresses (like v1.5)
-  if (tunnelUrl) {
-    const publicLabel = 'Public (Share with friends): ';
-    const publicContent = publicLabel + tunnelUrl;
-    const publicPadding = Math.max(0, boxWidth - publicContent.length);
-    console.log(chalk.cyan('║  ') + chalk.gray(publicLabel) + chalk.green.bold(tunnelUrl) + ' '.repeat(publicPadding) + chalk.cyan('║'));
-    console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
+  if (isTermux) {
+    // Mobile - compact display (max 50 chars width)
+    console.log(chalk.cyan('╔════════════════════════════════════════════╗'));
+    console.log(chalk.cyan('║') + chalk.green.bold('          🎮 SERVER RUNNING               ') + chalk.cyan('║'));
+    console.log(chalk.cyan('╚════════════════════════════════════════════╝'));
+    console.log('');
+    console.log(chalk.white.bold('📋 SERVER INFO'));
+    console.log(chalk.gray('  Name:   ') + chalk.white(config.name));
+    console.log(chalk.gray('  Type:   ') + chalk.white(`${config.type} ${config.version}`));
+    console.log(chalk.gray('  RAM:    ') + chalk.white(`${(config.ram / 1024).toFixed(1)}GB`));
+    console.log(chalk.gray('  Status: ') + chalk.green('● Running'));
+    console.log('');
+    console.log(chalk.white.bold('🌐 CONNECTION'));
   } else {
-    console.log(chalk.cyan('║  ') + chalk.yellow('⏳ Waiting for tunnel address...') + ' '.repeat(boxWidth - 33) + chalk.cyan('║'));
-    console.log(chalk.cyan('║  ') + chalk.gray('Check: https://playit.gg/account/agents') + ' '.repeat(boxWidth - 43) + chalk.cyan('║'));
+    // PC - full box display
+    const boxWidth = 60;
+    const line = '═'.repeat(boxWidth);
+    
+    console.log(chalk.cyan(`╔${line}╗`));
+    console.log(chalk.cyan('║') + chalk.green.bold(' '.repeat(18) + '🎮 SERVER RUNNING' + ' '.repeat(24)) + chalk.cyan('║'));
+    console.log(chalk.cyan(`╚${line}╝`));
+    console.log('');
+    
+    console.log(chalk.cyan(`╔${line}╗`));
+    console.log(chalk.cyan('║  ') + chalk.white.bold('SERVER INFORMATION') + ' '.repeat(boxWidth - 20) + chalk.cyan('║'));
+    console.log(chalk.cyan(`╠${line}╣`));
+    console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
+    console.log(chalk.cyan('║  ') + chalk.gray('Name: ') + chalk.white(config.name) + ' '.repeat(boxWidth - 8 - config.name.length) + chalk.cyan('║'));
+    console.log(chalk.cyan('║  ') + chalk.gray('Type: ') + chalk.white(`${config.type} ${config.version}`) + ' '.repeat(Math.max(0, boxWidth - 8 - config.type.length - config.version.length)) + chalk.cyan('║'));
+    const ramGB = (config.ram / 1024).toFixed(1) + 'GB';
+    console.log(chalk.cyan('║  ') + chalk.gray('RAM:  ') + chalk.white(ramGB) + ' '.repeat(boxWidth - 8 - ramGB.length) + chalk.cyan('║'));
+    
+    // Show directory path (truncate if too long)
+    const displayPath = serverPath.length > 50 ? '...' + serverPath.slice(-47) : serverPath;
+    const pathPadding = Math.max(0, boxWidth - 8 - displayPath.length);
+    console.log(chalk.cyan('║  ') + chalk.gray('Path: ') + chalk.white(displayPath) + ' '.repeat(pathPadding) + chalk.cyan('║'));
+    
+    console.log(chalk.cyan('║  ') + chalk.gray('Status: ') + chalk.green('● Running') + ' '.repeat(boxWidth - 18) + chalk.cyan('║'));
+    console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
+    console.log(chalk.cyan(`╠${line}╣`));
+    console.log(chalk.cyan('║  ') + chalk.white.bold('SERVER ADDRESSES') + ' '.repeat(boxWidth - 18) + chalk.cyan('║'));
+    console.log(chalk.cyan(`╠${line}╣`));
     console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
   }
   
+  // Connection Addresses - platform-specific formatting
+  if (tunnelUrl) {
+    if (isTermux) {
+      // Mobile - simple format (max 50 chars)
+      console.log(chalk.gray('  Public: ') + chalk.green.bold(tunnelUrl));
+    } else {
+      // PC - boxed format
+      const publicLabel = 'Public (Share with friends): ';
+      const publicContent = publicLabel + tunnelUrl;
+      const boxWidth = 60;
+      const publicPadding = Math.max(0, boxWidth - publicContent.length);
+      console.log(chalk.cyan('║  ') + chalk.gray(publicLabel) + chalk.green.bold(tunnelUrl) + ' '.repeat(publicPadding) + chalk.cyan('║'));
+      console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
+    }
+    
+    // Add warning for Bore reliability
+    if (tunnelUrl.includes('bore.pub')) {
+      if (isTermux) {
+        console.log(chalk.yellow('  ⚠️  Note: bore.pub may be unstable'));
+      } else {
+        const boxWidth = 60;
+        console.log(chalk.cyan('║  ') + chalk.yellow('⚠️  Note: bore.pub can be unreliable') + ' '.repeat(boxWidth - 36) + chalk.cyan('║'));
+        console.log(chalk.cyan('║  ') + chalk.gray('   If connection fails, check: ps aux | grep bore') + ' '.repeat(boxWidth - 51) + chalk.cyan('║'));
+        console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
+      }
+    }
+  } else {
+    if (isTermux) {
+      // Mobile - simple local only message
+      console.log(chalk.yellow('  Local network only'));
+    } else if (process.platform !== 'win32') {
+      // PC Linux - Bore manual entry
+      const boxWidth = 60;
+      console.log(chalk.cyan('║  ') + chalk.gray('Tunnel: ') + chalk.yellow('Local network only') + ' '.repeat(boxWidth - 35) + chalk.cyan('║'));
+      console.log(chalk.cyan('║  ') + chalk.gray('(Bore address entered manually)') + ' '.repeat(boxWidth - 34) + chalk.cyan('║'));
+      console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
+    } else {
+      // PC Windows - Playit waiting
+      const boxWidth = 60;
+      console.log(chalk.cyan('║  ') + chalk.yellow('⏳ Waiting for tunnel address...') + ' '.repeat(boxWidth - 33) + chalk.cyan('║'));
+      console.log(chalk.cyan('║  ') + chalk.gray('Check: https://playit.gg/account/agents') + ' '.repeat(boxWidth - 43) + chalk.cyan('║'));
+      console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
+    }
+  }
+  
   const localAddr = 'localhost:' + (config.port || 25565);
-  const localLabel = 'Local (Same network only): ';
-  const localContent = localLabel + localAddr;
-  const localPadding = Math.max(0, boxWidth - localContent.length);
-  console.log(chalk.cyan('║  ') + chalk.gray(localLabel) + chalk.yellow.bold(localAddr) + ' '.repeat(localPadding) + chalk.cyan('║'));
-  console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
-  console.log(chalk.cyan(`╚${line}╝`));
-  console.log('');
+  
+  if (isTermux) {
+    // Mobile - simple format (max 50 chars)
+    console.log(chalk.gray('  Local:  ') + chalk.yellow.bold(localAddr));
+    console.log('');
+  } else {
+    // PC - boxed format
+    const boxWidth = 60;
+    const localLabel = 'Local (Same network only): ';
+    const localContent = localLabel + localAddr;
+    const localPadding = Math.max(0, boxWidth - localContent.length);
+    console.log(chalk.cyan('║  ') + chalk.gray(localLabel) + chalk.yellow.bold(localAddr) + ' '.repeat(localPadding) + chalk.cyan('║'));
+    console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
+    const line = '═'.repeat(boxWidth);
+    console.log(chalk.cyan(`╚${line}╝`));
+    console.log('');
+  }
 
   // Detect platform
   const platform = process.platform;
@@ -806,9 +944,14 @@ async function ensurePlayit() {
   if (platform === 'win32') {
     filename = 'playit-windows.exe';
     url = 'https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-windows-x86_64.exe';
-  } else if (platform === 'linux' && arch === 'arm64') {
+  } else if (platform === 'linux' && (arch === 'arm64' || arch === 'aarch64')) {
+    // Android/Termux ARM64
     filename = 'playit-linux-aarch64';
     url = 'https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-aarch64';
+  } else if (platform === 'linux' && arch === 'arm') {
+    // Android/Termux ARM32 (older devices)
+    filename = 'playit-linux-armv7';
+    url = 'https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-armv7';
   } else if (platform === 'linux') {
     filename = 'playit-linux-amd64';
     url = 'https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64';
@@ -861,6 +1004,11 @@ async function ensurePlayit() {
 async function startBoreTunnel() {
   const spinner = ora('Checking Bore tunnel...').start();
   
+  // Detect Termux/Android at top of function
+  const isTermux = (process.env.PREFIX && process.env.PREFIX.includes('com.termux')) || 
+                   (process.env.HOME && process.env.HOME.includes('/com.termux/')) ||
+                   fs.existsSync('/data/data/com.termux');
+  
   try {
     // Check if bore is installed
     const { exec } = require('child_process');
@@ -875,8 +1023,6 @@ async function startBoreTunnel() {
       console.log(chalk.yellow('\n💡 Tunneling unavailable - Bore is not installed'));
       console.log(chalk.gray('   Your server will only be accessible on local network\n'));
       console.log(chalk.white('To enable public access, install Bore:\n'));
-      
-      const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
       
       if (process.platform === 'win32') {
         console.log(chalk.cyan('  1. Install Rust: https://rustup.rs'));
@@ -909,107 +1055,134 @@ async function startBoreTunnel() {
     
     spinner.text = 'Starting Bore tunnel...';
     
-    // Start bore tunnel - use inherit stdio on Android for direct output
+    // Start bore tunnel - use pipe to capture output but also echo it
     const bore = spawn(boreCommand, ['local', '25565', '--to', 'bore.pub'], {
-      stdio: isTermux ? 'inherit' : ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
       detached: !isTermux,
       env: process.env
     });
     
-    // Android/Termux - show output directly
-    if (isTermux) {
-      spinner.stop();
-      console.log(chalk.cyan('\n🚀 Starting Bore tunnel...\n'));
-      console.log(chalk.gray('─'.repeat(60)));
-      console.log(chalk.yellow('⏳ Connecting to bore.pub...\n'));
-      
-      // Wait for bore to start
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      console.log(chalk.gray('─'.repeat(60)));
-      console.log(chalk.yellow('\n💡 Look for "listening at bore.pub:XXXXX" in the output above'));
-      console.log(chalk.cyan('📋 If you see it, enter the address below:\n'));
-      
-      const { tunnelUrl } = await inquirer.prompt([{
-        type: 'input',
-        name: 'tunnelUrl',
-        message: 'Bore tunnel address (or leave empty to skip):',
-        default: '',
-        validate: (input) => {
-          if (!input || input.trim() === '') return true;
-          if (!input.match(/bore\.pub:\d+/i)) {
-            return 'Invalid format. Should be: bore.pub:12345';
-          }
-          return true;
-        }
-      }]);
-      
-      if (tunnelUrl && tunnelUrl.trim() && tunnelUrl !== 'bore.pub:') {
-        console.log(chalk.green('\n✅ Bore tunnel configured!'));
-        console.log(chalk.cyan('\n🌐 Public Address: ') + chalk.white.bold(tunnelUrl.trim()) + '\n');
-        return tunnelUrl.trim();
-      }
-      
-      bore.kill();
-      return null;
-    }
+    // Capture and display output simultaneously (all platforms for debugging)
+    spinner.stop();
+    console.log(chalk.cyan('\n🚀 Starting Bore tunnel...'));
+    console.log(chalk.gray(`Platform: ${process.platform}, Termux: ${isTermux}, PREFIX: ${process.env.PREFIX || 'not set'}`));
+    console.log(chalk.gray('─'.repeat(60)));
     
-    // Windows/Linux - capture output programmatically
     return new Promise((resolve) => {
       let outputBuffer = '';
       let resolved = false;
       
-      const captureOutput = (data) => {
+      const processOutput = (data) => {
         const text = data.toString();
         outputBuffer += text;
         
-        // Look for bore URL pattern
-        const patterns = [
-          /listening at bore\.pub:(\d+)/i,
-          /bore\.pub:(\d+)/i
-        ];
-        
-        for (const pattern of patterns) {
-          const match = text.match(pattern);
-          if (match && match[1] && !resolved) {
-            resolved = true;
-            const url = `bore.pub:${match[1]}`;
-            spinner.succeed(chalk.green('Tunnel started!'));
-            console.log(chalk.green(`\n🌐 Public Address: ${chalk.white.bold(url)}\n`));
-            bore.unref();
-            resolve(url);
-            return;
+        // Echo output to user with debug marker
+        console.log(chalk.gray('[BORE OUTPUT] ') + text.trim());
+          
+          // Look for bore.pub address patterns (multiple variations)
+          const patterns = [
+            /listening at bore\.pub:(\d+)/i,
+            /bore\.pub:(\d+)/i,
+            /port\s+(\d+)/i,
+            /:(\d{4,5})/
+          ];
+          
+          for (const pattern of patterns) {
+            const match = text.match(pattern);
+            if (match && match[1] && !resolved) {
+              const port = match[1];
+              // Validate port number
+              if (parseInt(port) > 1024 && parseInt(port) < 65535) {
+                resolved = true;
+                const tunnelUrl = `bore.pub:${port}`;
+                
+                console.log(chalk.gray('\n' + '─'.repeat(60)));
+                console.log(chalk.green('\n✅ Bore tunnel detected!'));
+                console.log(chalk.cyan('🌐 Public Address: ') + chalk.white.bold(tunnelUrl) + '\n');
+                
+                bore.unref();
+                resolve(tunnelUrl);
+                return;
+              }
+            }
           }
-        }
-      };
-      
-      bore.stdout.on('data', captureOutput);
-      bore.stderr.on('data', captureOutput);
-      
-      // Timeout after 15 seconds
-      setTimeout(() => {
+        };
+        
+        bore.stdout.on('data', processOutput);
+        bore.stderr.on('data', processOutput);
+        
+        // Timeout after 15 seconds
+        setTimeout(async () => {
+          if (!resolved) {
+            resolved = true;
+            console.log(chalk.gray('\n' + '─'.repeat(60)));
+            
+            // Try to find address in buffer with multiple patterns
+            let bufferMatch = outputBuffer.match(/bore\.pub:(\d+)/i);
+            if (!bufferMatch) {
+              bufferMatch = outputBuffer.match(/port\s+(\d+)/i);
+            }
+            
+            if (bufferMatch && bufferMatch[1]) {
+              const tunnelUrl = `bore.pub:${bufferMatch[1]}`;
+              console.log(chalk.green('\n✅ Bore tunnel found!'));
+              console.log(chalk.cyan('🌐 Public Address: ') + chalk.white.bold(tunnelUrl) + '\n');
+              bore.unref();
+              resolve(tunnelUrl);
+            } else {
+              // Manual fallback
+              console.log(chalk.yellow('\n⚠️  Could not auto-detect tunnel address'));
+              console.log(chalk.yellow('\n⚠️  Bore connection may have failed'));
+              console.log(chalk.white('\n💡 To troubleshoot:\n'));
+              console.log(chalk.cyan('   1. Test manually: ') + chalk.white('bore local 25565 --to bore.pub'));
+              console.log(chalk.cyan('   2. Check if running: ') + chalk.white('ps aux | grep bore'));
+              console.log(chalk.cyan('   3. If "timed out" error: bore.pub is down/blocked'));
+              console.log(chalk.yellow('\n💡 Alternative: Use ngrok or Playit (more reliable)\n'));
+              
+              const { tunnelUrl } = await inquirer.prompt([{
+                type: 'input',
+                name: 'tunnelUrl',
+                message: 'Enter Bore address (or leave empty):',
+                default: '',
+                validate: (input) => {
+                  if (!input || input.trim() === '') return true;
+                  if (!input.match(/bore\.pub:\d+/i)) {
+                    return 'Invalid format. Should be: bore.pub:12345';
+                  }
+                  return true;
+                }
+              }]);
+              
+              if (tunnelUrl && tunnelUrl.trim() && tunnelUrl !== 'bore.pub:') {
+                console.log(chalk.green('\n✅ Bore tunnel configured!'));
+                console.log(chalk.cyan('🌐 Public Address: ') + chalk.white.bold(tunnelUrl.trim()) + '\n');
+                bore.unref();
+                resolve(tunnelUrl.trim());
+              } else {
+                console.log(chalk.gray('\nServer will be local network only\n'));
+                bore.kill();
+                resolve(null);
+              }
+            }
+          }
+        }, 15000);
+        
+      bore.on('error', (err) => {
         if (!resolved) {
           resolved = true;
-          
-          // Check output buffer
-          const match = outputBuffer.match(/bore\.pub:(\d+)/i);
-          if (match && match[1]) {
-            const url = `bore.pub:${match[1]}`;
-            spinner.succeed(chalk.green('Tunnel started!'));
-            console.log(chalk.green(`\n🌐 Public Address: ${chalk.white.bold(url)}\n`));
-            bore.unref();
-            resolve(url);
-            return;
-          }
-          
-          spinner.warn(chalk.yellow('Tunnel started (address pending)'));
-          console.log(chalk.yellow('\n⏳ Bore tunnel may be connecting...\n'));
-          console.log(chalk.gray('Note: bore.pub can be unreliable. Consider using Playit.gg instead.\n'));
-          bore.unref();
+          console.log(chalk.red('\n❌ Bore tunnel failed'));
+          console.log(chalk.yellow('\n⚠️  Common issues:'));
+          console.log(chalk.gray('   • bore.pub might be down or blocked by your network'));
+          console.log(chalk.gray('   • Your ISP/firewall may be blocking tunneling'));
+          console.log(chalk.gray('   • Try manually: ') + chalk.cyan('bore local 25565 --to bore.pub'));
+          console.log(chalk.yellow('\n💡 Alternative solutions:'));
+          console.log(chalk.gray('   1. Use ngrok: ') + chalk.cyan('pkg install ngrok && ngrok tcp 25565'));
+          console.log(chalk.gray('   2. Use Playit: See PLAYIT-SETUP.md'));
+          console.log(chalk.gray('   3. Local network only (no tunnel)\n'));
           resolve(null);
         }
-      }, 15000);
+      });
     });
   } catch (error) {
     spinner.fail('Tunnel failed');

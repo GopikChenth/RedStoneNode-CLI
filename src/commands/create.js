@@ -8,6 +8,7 @@ const path = require('path');
 const chalk = require('chalk');
 const ora = require('ora');
 const axios = require('axios');
+const os = require('os');
 const { getServersDir } = require('./list');
 
 // Get location choices based on platform
@@ -82,8 +83,8 @@ async function createServer() {
     {
       type: 'input',
       name: 'ram',
-      message: 'RAM (MB):',
-      default: '1024',
+      message: `RAM (GB) [Available: ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(1)}GB]:`,
+      default: '1',
       validate: input => !isNaN(input) || 'Must be a number'
     },
     {
@@ -164,7 +165,7 @@ async function createServer() {
       name: answers.name,
       type: answers.type,
       version: answers.version,
-      ram: parseInt(answers.ram),
+      ram: parseInt(answers.ram) * 1024, // Convert GB to MB
       path: serverPath,
       locationType: answers.locationChoice,
       isCustomLocation: answers.locationChoice !== 'default',
@@ -208,8 +209,18 @@ async function downloadServerJar(type, version, serverPath) {
 
   switch (type) {
     case 'Vanilla':
-      // Mojang version manifest
-      url = `https://piston-data.mojang.com/v1/objects/145ff0858209bcfc164859ba735d4199aafa1eea/server.jar`;
+      // Fetch version manifest to get correct download URL
+      const manifestUrl = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
+      const manifestResponse = await axios.get(manifestUrl);
+      const versionData = manifestResponse.data.versions.find(v => v.id === version);
+      
+      if (!versionData) {
+        throw new Error(`Version ${version} not found in Mojang manifest`);
+      }
+      
+      // Get version JSON with download URL
+      const versionJsonResponse = await axios.get(versionData.url);
+      url = versionJsonResponse.data.downloads.server.url;
       break;
     
     case 'Paper':
