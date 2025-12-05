@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.4] - 2025-12-05
+
+### 📝 Documentation Updates
+- **README**: Added tagline "Your Minecraft Server, Now in Your Pocket."
+- **Description**: Highlighted free hosting alternative for users who can't afford paid services
+- **Author**: Updated to Pixel Foundry
+- Emphasized zero monthly fees and no subscription costs
+
+---
+
 ## [2.4.3] - 2025-12-05
 
 ### 📝 Documentation Updates

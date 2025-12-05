@@ -16,7 +16,7 @@ async function showMainMenu() {
   if (isTermux) {
     // Mobile/Termux - compact banner (46 chars)
     console.log(chalk.cyan('╔════════════════════════════════════════════╗'));
-    console.log(chalk.cyan('║') + chalk.green.bold('       📱 RedStone Mobile v2.4.3         ') + chalk.cyan('║'));
+    console.log(chalk.cyan('║') + chalk.green.bold('       📱 RedStone Mobile v2.4.4         ') + chalk.cyan('║'));
     console.log(chalk.cyan('╚════════════════════════════════════════════╝'));
   } else {
     // PC - full banner (44 chars content)

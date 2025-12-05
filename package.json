@@ -1,6 +1,6 @@
 {
   "name": "redstonenode-cli",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "description": "Fast, lightweight Minecraft server CLI for Windows, Linux, and Android",
   "main": "src/index.js",
   "bin": {
@@ -15,7 +15,7 @@
     "cli",
     "termux"
   ],
-  "author": "RedStone Team",
+  "author": "Pixel Foundry",
   "license": "MIT",
   "engines": {
     "node": ">=14.0.0"

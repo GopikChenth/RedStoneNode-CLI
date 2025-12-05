@@ -1,12 +1,12 @@
 # 🎮 RedStone CLI
 
-> Fast, lightweight Minecraft server manager for Windows, Linux, and Android
+> **Your Minecraft Server, Now in Your Pocket.**
 
 [![npm version](https://img.shields.io/npm/v/redstonenode-cli.svg)](https://www.npmjs.com/package/redstonenode-cli)
 [![npm downloads](https://img.shields.io/npm/dm/redstonenode-cli.svg)](https://www.npmjs.com/package/redstonenode-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Create and manage Minecraft servers with a simple CLI. Works on PC and Android (Termux). Includes automated tunneling for online play.
+**Can't afford paid Minecraft hosting?** RedStone CLI lets you host your own server for free — on your PC, laptop, or even your Android phone. No monthly fees, no subscriptions. Just run a single command and play with friends. Supports Vanilla, Paper, Fabric, and Forge servers with built-in tunneling for online multiplayer.
 
 ---
 
