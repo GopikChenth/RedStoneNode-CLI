@@ -22,7 +22,7 @@ redstone
 ```bash
 # Install dependencies
 pkg update && pkg upgrade
-pkg install nodejs git openjdk-17
+pkg install nodejs git openjdk-21
 
 # Install RedStone CLI
 npm install -g redstonenode-cli
@@ -33,6 +33,8 @@ termux-setup-storage
 # Run
 redstone
 ```
+
+> **Note**: Java 21 is required for Minecraft 1.20+. For older versions (1.19 and below), use `openjdk-17`.
 
 ---
 
@@ -62,8 +64,7 @@ redstone tutorial
 - **4 Server Types**: Vanilla, Paper, Fabric, Forge
 - **Multi-Version**: 1.21.4 down to 1.12.2
 - **Easy Management**: Start, stop, configure from one menu
-- **Mobile-Optimized**: Special UI for Android/Termux (46-char width)
-- **Smart RAM**: Shows available memory, input in GB
+- **Cross-Platform**: Optimized for Windows, Linux, Mac, and Android
 
 ### 🌍 World Management
 - Backup/Restore worlds with timestamps
@@ -87,7 +88,7 @@ redstone tutorial
 | **Windows** | Bore | ❌ Not supported |
 | **Linux** | Playit.gg | ✅ Works |
 | **Linux** | Bore | ✅ Works |
-| **Android/Termux** | Bore | ⚠️ Unreliable (bore.pub issues) |
+| **Android/Termux** | Bore | ✅ Working |
 | **Android/Termux** | Playit.gg | ❌ Not supported (ARM64 issues) |
 
 **Mobile ISPs block port forwarding** - You MUST use home WiFi/broadband for online servers!
@@ -206,7 +207,10 @@ redstone
 ## 🛠️ Requirements
 
 - **Node.js** 14.0.0 or higher
-- **Java** 17+ (for Minecraft 1.18+) or Java 8+ (older versions)
+- **Java**:
+  - Java 21+ (Minecraft 1.20+)
+  - Java 17+ (Minecraft 1.18-1.19)
+  - Java 8+ (Minecraft 1.17 and below)
 - **RAM**: 2GB+ recommended for smooth gameplay
 - **Internet**: Broadband connection required for online play
 

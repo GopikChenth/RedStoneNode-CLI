@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.3] - 2025-12-05
+
+### 📝 Documentation Updates
+- Updated README: Removed redundant feature descriptions
+- Updated Java version: Java 21 for Minecraft 1.20+, Java 17 for older versions
+- Updated Bore status: Changed from "Unreliable" to "Working" for Android/Termux
+- Simplified feature list for better clarity
+
+---
+
 ## [2.4.2] - 2025-12-05
 
 ### ✨ New Features

@@ -16,14 +16,14 @@ async function showMainMenu() {
   if (isTermux) {
     // Mobile/Termux - compact banner (46 chars)
     console.log(chalk.cyan('╔════════════════════════════════════════════╗'));
-    console.log(chalk.cyan('║') + chalk.green.bold('       📱 RedStone Mobile v2.4.2         ') + chalk.cyan('║'));
+    console.log(chalk.cyan('║') + chalk.green.bold('       📱 RedStone Mobile v2.4.3         ') + chalk.cyan('║'));
     console.log(chalk.cyan('╚════════════════════════════════════════════╝'));
   } else {
-    // PC - full banner
-    console.log(chalk.cyan('╔════════════════════════════════════════╗'));
-    console.log(chalk.cyan('║') + chalk.green.bold('        🎮 RedStone CLI v2.3.3        ') + chalk.cyan('║'));
-    console.log(chalk.cyan('║') + chalk.gray('   Minecraft Server Management Tool   ') + chalk.cyan('║'));
-    console.log(chalk.cyan('╚════════════════════════════════════════╝'));
+    // PC - full banner (44 chars content)
+    console.log(chalk.cyan('╔════════════════════════════════════════════╗'));
+    console.log(chalk.cyan('║') + chalk.green.bold('       🎮 RedStone CLI v2.4.2            ') + chalk.cyan('║'));
+    console.log(chalk.cyan('║') + chalk.gray('    Minecraft Server Management Tool    ') + chalk.cyan('║'));
+    console.log(chalk.cyan('╚════════════════════════════════════════════╝'));
   }
   
   const { action } = await inquirer.prompt([{
