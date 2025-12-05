@@ -8,8 +8,25 @@ const chalk = require('chalk');
 const inquirer = require('inquirer');
 const os = require('os');
 
-// Get servers directory
+// Get servers directory - returns shared storage on Android/Termux by default
 const getServersDir = () => {
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
+  
+  if (isTermux) {
+    // Check if storage is accessible
+    const sharedStorage = '/storage/emulated/0/Documents/RedStone-Servers';
+    try {
+      if (fs.existsSync('/storage/emulated/0')) {
+        return sharedStorage;
+      }
+    } catch (e) {
+      // Fall back to Termux home if shared storage not accessible
+    }
+    // Fallback to Termux home if storage not set up
+    return path.join(os.homedir(), '.redstone', 'servers');
+  }
+  
+  // Windows/Linux/Mac - use home directory
   return path.join(os.homedir(), '.redstone', 'servers');
 };
 
@@ -153,15 +170,18 @@ async function showServerList() {
         // Regular server in default location
         const configPath = path.join(itemPath, 'redstone.json');
         if (await fs.pathExists(configPath)) {
-          const config = await fs.readJson(configPath);
-          servers.push({
-            name: item,
-            type: config.type || 'Unknown',
-            version: config.version || 'Unknown',
-            ram: config.ram || 1024,
-            status: 'Stopped' // TODO: Check if actually running
-          });
-          serverPaths.set(item, itemPath);
+          // Check if this server is already in the list (from .link file)
+          if (!serverPaths.has(item)) {
+            const config = await fs.readJson(configPath);
+            servers.push({
+              name: item,
+              type: config.type || 'Unknown',
+              version: config.version || 'Unknown',
+              ram: config.ram || 1024,
+              status: 'Stopped' // TODO: Check if actually running
+            });
+            serverPaths.set(item, itemPath);
+          }
         }
       }
     }

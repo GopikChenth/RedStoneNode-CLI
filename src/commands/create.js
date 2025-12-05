@@ -130,6 +130,7 @@ async function createServer() {
     }]);
     serverPath = customPath;
   } else {
+    // Default location - use getServersDir() which handles the actual default
     serverPath = path.join(getServersDir(), answers.name);
   }
   
@@ -170,9 +171,11 @@ async function createServer() {
       created: new Date().toISOString()
     });
 
-    // If custom or shared location, also save a reference in default servers dir
-    if (answers.locationChoice === 'custom' || answers.locationChoice === 'shared') {
-      const defaultServersDir = getServersDir();
+    // Only create .link file if server is NOT in the default directory
+    const defaultServersDir = getServersDir();
+    const isInDefaultDir = serverPath.startsWith(defaultServersDir);
+    
+    if (!isInDefaultDir && (answers.locationChoice === 'custom' || answers.locationChoice === 'shared')) {
       await fs.ensureDir(defaultServersDir);
       const linkFile = path.join(defaultServersDir, `${answers.name}.link`);
       await fs.writeJson(linkFile, {
