@@ -2,6 +2,17 @@
 
 ## [2.1.3] - 2025-12-05
 
+### 🐛 Bug Fixes
+- **Bore Tunnel**: Fixed Bore not working on Android/Termux
+  - Now uses `stdio: 'inherit'` to show direct output on Android
+  - Checks `~/.cargo/bin/bore` path automatically
+  - Interactive prompt to enter Bore address after connection
+  - Better error handling and timeout management
+- **Duplicate Servers**: Fixed servers appearing twice in list
+  - Added check to prevent duplicates from .link files
+  - Only creates .link files for non-default locations
+  - Improved server path resolution
+
 ### ✨ New Features
 - **Android/Termux Shared Storage** (Major improvement!)
   - Default server location changed to `/storage/emulated/0/Documents/RedStone-Servers/`

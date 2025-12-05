@@ -847,12 +847,63 @@ async function startBoreTunnel() {
       return null;
     }
     
-    // Start bore tunnel
-    const bore = spawn('bore', ['local', '25565', '--to', 'bore.pub'], {
-      detached: true,
-      stdio: ['ignore', 'pipe', 'pipe']
+    // Check which bore command to use
+    let boreCommand = 'bore';
+    const cargoPath = path.join(process.env.HOME || os.homedir(), '.cargo', 'bin', 'bore');
+    
+    if (await fs.pathExists(cargoPath)) {
+      boreCommand = cargoPath;
+    }
+    
+    spinner.text = 'Starting Bore tunnel...';
+    
+    // Start bore tunnel - use inherit stdio on Android for direct output
+    const bore = spawn(boreCommand, ['local', '25565', '--to', 'bore.pub'], {
+      stdio: isTermux ? 'inherit' : ['ignore', 'pipe', 'pipe'],
+      shell: false,
+      detached: !isTermux,
+      env: process.env
     });
     
+    // Android/Termux - show output directly
+    if (isTermux) {
+      spinner.stop();
+      console.log(chalk.cyan('\n🚀 Starting Bore tunnel...\n'));
+      console.log(chalk.gray('─'.repeat(60)));
+      console.log(chalk.yellow('⏳ Connecting to bore.pub...\n'));
+      
+      // Wait for bore to start
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      console.log(chalk.gray('─'.repeat(60)));
+      console.log(chalk.yellow('\n💡 Look for "listening at bore.pub:XXXXX" in the output above'));
+      console.log(chalk.cyan('📋 If you see it, enter the address below:\n'));
+      
+      const { tunnelUrl } = await inquirer.prompt([{
+        type: 'input',
+        name: 'tunnelUrl',
+        message: 'Bore tunnel address (or leave empty to skip):',
+        default: '',
+        validate: (input) => {
+          if (!input || input.trim() === '') return true;
+          if (!input.match(/bore\.pub:\d+/i)) {
+            return 'Invalid format. Should be: bore.pub:12345';
+          }
+          return true;
+        }
+      }]);
+      
+      if (tunnelUrl && tunnelUrl.trim() && tunnelUrl !== 'bore.pub:') {
+        console.log(chalk.green('\n✅ Bore tunnel configured!'));
+        console.log(chalk.cyan('\n🌐 Public Address: ') + chalk.white.bold(tunnelUrl.trim()) + '\n');
+        return tunnelUrl.trim();
+      }
+      
+      bore.kill();
+      return null;
+    }
+    
+    // Windows/Linux - capture output programmatically
     return new Promise((resolve) => {
       let outputBuffer = '';
       let resolved = false;
