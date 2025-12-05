@@ -1,6 +1,6 @@
 {
   "name": "redstonenode-cli",
-  "version": "2.1.1",
+  "version": "2.1.3",
   "description": "Fast, lightweight Minecraft server CLI for Windows, Linux, and Android",
   "main": "src/index.js",
   "bin": {

@@ -589,6 +589,12 @@ async function displayServerInfo(serverPath, config, tunnelUrl) {
   console.log(chalk.cyan('║  ') + chalk.gray('Name: ') + chalk.white(config.name) + ' '.repeat(boxWidth - 8 - config.name.length) + chalk.cyan('║'));
   console.log(chalk.cyan('║  ') + chalk.gray('Type: ') + chalk.white(`${config.type} ${config.version}`) + ' '.repeat(Math.max(0, boxWidth - 8 - config.type.length - config.version.length)) + chalk.cyan('║'));
   console.log(chalk.cyan('║  ') + chalk.gray('RAM:  ') + chalk.white(`${config.ram}MB`) + ' '.repeat(boxWidth - 8 - config.ram.toString().length - 2) + chalk.cyan('║'));
+  
+  // Show directory path (truncate if too long)
+  const displayPath = serverPath.length > 50 ? '...' + serverPath.slice(-47) : serverPath;
+  const pathPadding = Math.max(0, boxWidth - 8 - displayPath.length);
+  console.log(chalk.cyan('║  ') + chalk.gray('Path: ') + chalk.white(displayPath) + ' '.repeat(pathPadding) + chalk.cyan('║'));
+  
   console.log(chalk.cyan('║  ') + chalk.gray('Status: ') + chalk.green('● Running') + ' '.repeat(boxWidth - 18) + chalk.cyan('║'));
   console.log(chalk.cyan('║') + ' '.repeat(boxWidth) + chalk.cyan('║'));
   console.log(chalk.cyan(`╠${line}╣`));
@@ -801,7 +807,7 @@ async function ensurePlayit() {
 }
 
 async function startBoreTunnel() {
-  const spinner = ora('Starting Bore tunnel...').start();
+  const spinner = ora('Checking Bore tunnel...').start();
   
   try {
     // Check if bore is installed
@@ -811,17 +817,30 @@ async function startBoreTunnel() {
     
     try {
       await execPromise('bore --version');
+      spinner.text = 'Starting Bore tunnel...';
     } catch (error) {
-      spinner.fail('Bore not installed');
-      console.log(chalk.yellow('\n⚠️  Bore is not installed\n'));
-      console.log(chalk.white('To install Bore:\n'));
+      spinner.info('Bore not installed - skipping tunnel');
+      console.log(chalk.yellow('\n💡 Tunneling unavailable - Bore is not installed'));
+      console.log(chalk.gray('   Your server will only be accessible on local network\n'));
+      console.log(chalk.white('To enable public access, install Bore:\n'));
+      
+      const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
       
       if (process.platform === 'win32') {
-        console.log(chalk.cyan('  cargo install bore-cli'));
+        console.log(chalk.cyan('  1. Install Rust: https://rustup.rs'));
+        console.log(chalk.cyan('  2. Run: cargo install bore-cli'));
+        console.log(chalk.gray('\n  Or use Playit.gg (recommended for Windows)'));
+      } else if (isTermux) {
+        console.log(chalk.cyan('  📱 For Termux/Android:\n'));
+        console.log(chalk.white('  1. Install Rust:'));
+        console.log(chalk.cyan('     pkg install rust -y'));
+        console.log(chalk.white('\n  2. Install Bore (takes 5-10 minutes):'));
+        console.log(chalk.cyan('     cargo install bore-cli'));
+        console.log(chalk.gray('\n  3. Add to PATH:'));
+        console.log(chalk.cyan('     export PATH=$HOME/.cargo/bin:$PATH'));
+        console.log(chalk.gray('\n  Note: Compilation needs ~500MB free RAM'));
       } else {
         console.log(chalk.cyan('  cargo install bore-cli'));
-        console.log(chalk.gray('  or'));
-        console.log(chalk.cyan('  pkg install rust -y && cargo install bore-cli') + chalk.gray(' (Termux)'));
       }
       
       console.log(chalk.gray('\nMore info: https://github.com/ekzhang/bore\n'));

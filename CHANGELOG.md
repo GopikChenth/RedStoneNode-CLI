@@ -1,5 +1,53 @@
 # Changelog
 
+## [2.1.3] - 2025-12-05
+
+### ✨ New Features
+- **Android/Termux Shared Storage** (Major improvement!)
+  - Default server location changed to `/storage/emulated/0/Documents/RedStone-Servers/`
+  - Easy access with any file manager app (no special URIs needed)
+  - Three location options: Shared Storage (recommended), Termux Home, Custom
+  - Added `termux-setup-storage` requirement to setup guide
+
+### 🔧 Improvements
+- **Enhanced "Open Files" option**
+  - Shows all 3 access methods on Android (Document URI, Direct Path, Termux Home)
+  - Added helper function for better path display
+  - Automatic `termux-open` command with fallback to manual paths
+  - Platform-specific file manager opening (Windows Explorer, macOS Finder, Linux xdg-open)
+
+### 📝 Documentation
+- Added First-Time Setup section emphasizing `termux-setup-storage`
+- Updated TERMUX-SETUP.md with new default location
+- Clear explanation of shared storage benefits
+
+### 📝 Notes
+Android users: Run `termux-setup-storage` before creating servers for best experience!
+
+---
+
+## [2.1.2] - 2025-12-05
+
+### 🐛 Bug Fixes
+- **Bore Tunneling**: Made Bore installation optional
+  - Server now starts successfully even without Bore installed
+  - Shows clear installation instructions for Rust + Bore
+  - Termux-specific PATH setup guidance
+  - Platform-specific recommendations (Playit for Windows, Bore for Linux/Android)
+- **Server Path Display**: Added full directory path in server info box
+  - Shows exact location of server files
+  - Helps users locate world folder and configuration files
+  - Displays path on server creation
+- **Termux Documentation**: Enhanced TERMUX-SETUP.md
+  - Detailed Bore installation steps with PATH setup
+  - Server file location troubleshooting
+  - Memory requirements for Bore compilation
+
+### 📝 Notes
+Bore is optional - your server will work on local network without it!
+
+---
+
 ## [2.1.1] - 2025-12-04
 
 ### 🐛 Bug Fixes

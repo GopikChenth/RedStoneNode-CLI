@@ -28,6 +28,89 @@ async function resolveServerPath(serverName) {
   return path.join(serversDir, serverName);
 }
 
+// Show Termux file paths for manual navigation
+function showTermuxFilePaths(serverPath) {
+  console.log(chalk.white('📁 Access your server files:\n'));
+  
+  console.log(chalk.cyan('Option 1:') + chalk.white(' Direct Path'));
+  console.log(chalk.gray(`   ${serverPath}\n`));
+  
+  console.log(chalk.cyan('Option 2:') + chalk.white(' Termux Home Directory'));
+  console.log(chalk.gray('   /data/data/com.termux/files/home/.redstone/servers/\n'));
+  
+  console.log(chalk.cyan('Option 3:') + chalk.white(' Document Provider URI (for file pickers)'));
+  console.log(chalk.gray('   content://com.termux.documents/tree/%2Fdata%2Fdata%2F'));
+  console.log(chalk.gray('   com.termux%2Ffiles%2Fhome\n'));
+  
+  console.log(chalk.white('💡 Tip: Run ') + chalk.cyan('termux-setup-storage') + chalk.white(' for easier access\n'));
+}
+
+// Open server files in file manager
+async function openServerFiles(serverPath) {
+  const { exec } = require('child_process');
+  const { spawn } = require('child_process');
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
+  
+  console.log(chalk.cyan(`\n📁 Server Location:\n`));
+  console.log(chalk.white(`   ${serverPath}\n`));
+  
+  if (isTermux) {
+    // Android/Termux - use termux-open
+    console.log(chalk.yellow('📱 Opening in file manager...\n'));
+    
+    try {
+      // Try termux-open first
+      const termuxOpen = spawn('termux-open', [serverPath], {
+        detached: true,
+        stdio: 'ignore'
+      });
+      
+      termuxOpen.on('error', (err) => {
+        // If termux-open fails, show manual instructions
+        console.log(chalk.yellow('⚠️  termux-open not available\n'));
+        showTermuxFilePaths(serverPath);
+      });
+      
+      termuxOpen.unref();
+      
+      console.log(chalk.gray('If file manager didn\'t open, navigate manually:\n'));
+      showTermuxFilePaths(serverPath);
+      
+    } catch (error) {
+      console.log(chalk.yellow('⚠️  Could not open file manager\n'));
+      showTermuxFilePaths(serverPath);
+    }
+    
+  } else if (process.platform === 'win32') {
+    // Windows - use explorer
+    console.log(chalk.green('✅ Opening in File Explorer...\n'));
+    exec(`explorer "${serverPath}"`);
+    
+  } else if (process.platform === 'darwin') {
+    // macOS - use Finder
+    console.log(chalk.green('✅ Opening in Finder...\n'));
+    exec(`open "${serverPath}"`);
+    
+  } else {
+    // Linux - use xdg-open
+    console.log(chalk.green('✅ Opening file manager...\n'));
+    exec(`xdg-open "${serverPath}"`, (error) => {
+      if (error) {
+        console.log(chalk.yellow('⚠️  Could not open file manager automatically\n'));
+        console.log(chalk.white('Navigate to this path manually:\n'));
+        console.log(chalk.cyan(`   ${serverPath}\n`));
+      }
+    });
+  }
+  
+  // Wait for user acknowledgment
+  await inquirer.prompt([{
+    type: 'input',
+    name: 'continue',
+    message: 'Press Enter to continue...'
+  }]);
+}
+
 async function showServerList() {
   const serversDir = getServersDir();
   await fs.ensureDir(serversDir);
@@ -176,15 +259,7 @@ async function showServerMenu(serverName, serverPath) {
       await manageProperties(serverName, serverPath);
       break;
     case 'files':
-      console.log(chalk.cyan(`\n📁 Opening: ${serverPath}\n`));
-      const { exec } = require('child_process');
-      if (process.platform === 'win32') {
-        exec(`explorer "${serverPath}"`);
-      } else if (process.platform === 'darwin') {
-        exec(`open "${serverPath}"`);
-      } else {
-        exec(`xdg-open "${serverPath}"`);
-      }
+      await openServerFiles(serverPath);
       break;
     case 'delete':
       const { confirm } = await inquirer.prompt([{

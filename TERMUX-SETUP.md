@@ -21,6 +21,18 @@ pkg install termux-api
 npm install -g redstonenode-cli
 ```
 
+## First-Time Setup (Important!)
+
+**Before creating servers, grant storage permissions:**
+```bash
+termux-setup-storage
+```
+
+This allows:
+- ✅ Servers to be created in `/storage/emulated/0/Documents/` (easy file manager access)
+- ✅ Accessing server files with any file manager app
+- ✅ No need for special URIs or complex paths
+
 ## Usage
 
 ```bash
@@ -28,6 +40,32 @@ redstone
 ```
 
 ## Important Notes
+
+### 0. Accessing Server Files
+**Default Location (Recommended):**
+- **Shared Storage**: `/storage/emulated/0/Documents/RedStone-Servers/` ✅ Easy access!
+- You can browse this folder with any file manager app
+- No need for special URIs or permissions
+
+**Alternative Locations:**
+- **Termux Home**: `/data/data/com.termux/files/home/.redstone/servers/`
+- **Termux Home URI**: `content://com.termux.documents/tree/%2Fdata%2Fdata%2Fcom.termux%2Ffiles%2Fhome`
+- Run `termux-setup-storage` to grant file manager access
+
+**From Termux:**
+```bash
+# Open server folder in file manager
+termux-open ~/.redstone/servers/my-server
+
+# Or navigate manually
+cd ~/.redstone/servers/my-server
+```
+
+**From RedStone CLI:**
+```bash
+redstone
+# Select server → "📁 Open Files"
+```
 
 ### 1. Keep Termux Running
 - Keep the Termux app open in the background
@@ -43,10 +81,15 @@ pkg install termux-api
 Download Termux:API app from F-Droid: https://f-droid.org/packages/com.termux.api/
 
 ### 3. Storage Access
-Grant storage permissions to access custom directories:
+Grant storage permissions to access custom directories and use file managers:
 ```bash
 termux-setup-storage
 ```
+
+After running this, you can:
+- Access Termux files in your file manager
+- Create servers in `/storage/emulated/0/` (internal storage)
+- Use `termux-open` command to open folders
 
 ### 4. Battery Optimization
 - Disable battery optimization for Termux in Android settings
@@ -65,14 +108,22 @@ Leave at least 512MB for Android system!
 Bore is automatically used as the default tunnel on Termux:
 
 ```bash
-# Install Rust (if not installed)
-pkg install rust
+# 1. Install Rust (if not installed)
+pkg install rust -y
 
-# Install Bore
+# 2. Install Bore (takes 5-10 minutes to compile)
 cargo install bore-cli
+
+# 3. Add to PATH (add this to ~/.bashrc for permanent)
+export PATH=$HOME/.cargo/bin:$PATH
+
+# 4. Verify installation
+bore --version
 
 # Bore will be used automatically when starting servers
 ```
+
+**Note**: Bore compilation requires ~500MB free RAM. If it fails, close other apps and try again.
 
 ### Playit.gg (Alternative)
 Playit.gg also works on Termux but requires more setup.
@@ -96,6 +147,50 @@ npm install -g redstonenode-cli --force
 
 ### Out of Memory errors
 Reduce RAM allocation in server configuration. Termux has memory limits.
+
+### Cannot find server files
+Your servers are stored in: `~/.redstone/servers/`
+
+**Option 1: Using File Manager (Recommended)**
+
+Method 1 - Document Provider URI (Android file pickers):
+```
+content://com.termux.documents/tree/%2Fdata%2Fdata%2Fcom.termux%2Ffiles%2Fhome
+```
+
+Method 2 - Direct filesystem path:
+1. Open any file manager app (Files, Solid Explorer, MiXplorer, etc.)
+2. Navigate to: `/data/data/com.termux/files/home/.redstone/servers/`
+3. Full server path: `/data/data/com.termux/files/home/.redstone/servers/my-server/`
+
+**Option 2: Using Termux Commands**
+```bash
+# List all servers
+ls ~/.redstone/servers/
+
+# Go to your server directory
+cd ~/.redstone/servers/my-server
+
+# View files
+ls -la
+
+# Open in file manager from Termux
+termux-open ~/.redstone/servers/my-server
+```
+
+**Option 3: Use "Open Files" in RedStone CLI**
+```bash
+redstone
+# Select your server → Choose "📁 Open Files"
+# It will automatically open the folder or show the path
+```
+
+**Tip**: Grant storage permissions for better file manager access:
+```bash
+termux-setup-storage
+```
+
+If you chose a custom location during creation (like `/storage/emulated/0/`), check the path shown when the server was created.
 
 ### Port already in use
 Check if another server is running:

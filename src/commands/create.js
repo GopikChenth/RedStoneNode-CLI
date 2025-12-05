@@ -10,6 +10,36 @@ const ora = require('ora');
 const axios = require('axios');
 const { getServersDir } = require('./list');
 
+// Get location choices based on platform
+async function getLocationChoices() {
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
+  
+  if (isTermux) {
+    // Check if storage is set up
+    const storageSetup = await fs.pathExists('/storage/emulated/0');
+    
+    if (storageSetup) {
+      return [
+        { name: '📁 Shared Storage (Recommended) - /storage/emulated/0/Documents/RedStone-Servers', value: 'shared' },
+        { name: '🏠 Termux Home - ~/.redstone/servers', value: 'default' },
+        { name: '📂 Custom directory', value: 'custom' }
+      ];
+    } else {
+      return [
+        { name: '🏠 Termux Home - ~/.redstone/servers', value: 'default' },
+        { name: '📁 Shared Storage - /storage/emulated/0/Documents/RedStone-Servers', value: 'shared' },
+        { name: '📂 Custom directory', value: 'custom' }
+      ];
+    }
+  }
+  
+  // Windows/Linux/Mac
+  return [
+    { name: '📁 Default - ~/.redstone/servers', value: 'default' },
+    { name: '📂 Custom directory', value: 'custom' }
+  ];
+}
+
 async function createServer() {
   console.log(chalk.cyan('\n📦 Create New Minecraft Server\n'));
 
@@ -60,21 +90,31 @@ async function createServer() {
       type: 'list',
       name: 'locationChoice',
       message: 'Server location:',
-      choices: [
-        { name: '📁 Default (~/.redstone/servers)', value: 'default' },
-        { name: '📂 Custom directory', value: 'custom' }
-      ]
+      choices: await getLocationChoices()
     }
   ]);
 
   let serverPath;
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
   
-  if (answers.locationChoice === 'custom') {
+  if (answers.locationChoice === 'shared') {
+    // Shared storage for Android/Termux
+    const sharedBase = '/storage/emulated/0/Documents/RedStone-Servers';
+    serverPath = path.join(sharedBase, answers.name);
+    
+    // Ensure Documents directory exists
+    await fs.ensureDir('/storage/emulated/0/Documents');
+    
+  } else if (answers.locationChoice === 'custom') {
+    const defaultCustom = isTermux 
+      ? path.join('/storage/emulated/0', answers.name)
+      : path.join(require('os').homedir(), 'Desktop', answers.name);
+    
     const { customPath } = await inquirer.prompt([{
       type: 'input',
       name: 'customPath',
       message: 'Enter custom directory path:',
-      default: path.join(require('os').homedir(), 'Desktop', answers.name),
+      default: defaultCustom,
       validate: input => {
         if (!input || input.trim().length === 0) {
           return 'Path cannot be empty';
@@ -125,12 +165,13 @@ async function createServer() {
       version: answers.version,
       ram: parseInt(answers.ram),
       path: serverPath,
-      isCustomLocation: answers.locationChoice === 'custom',
+      locationType: answers.locationChoice,
+      isCustomLocation: answers.locationChoice !== 'default',
       created: new Date().toISOString()
     });
 
-    // If custom location, also save a reference in default servers dir
-    if (answers.locationChoice === 'custom') {
+    // If custom or shared location, also save a reference in default servers dir
+    if (answers.locationChoice === 'custom' || answers.locationChoice === 'shared') {
       const defaultServersDir = getServersDir();
       await fs.ensureDir(defaultServersDir);
       const linkFile = path.join(defaultServersDir, `${answers.name}.link`);
@@ -142,7 +183,15 @@ async function createServer() {
     }
 
     console.log(chalk.green(`\n✅ Server "${answers.name}" created successfully!`));
-    console.log(chalk.gray(`   Location: ${serverPath}\n`));
+    console.log(chalk.cyan('\n📁 Server Location:'));
+    console.log(chalk.white(`   ${serverPath}`));
+    
+    // Show how to access files
+    const isTermux = process.env.PREFIX && process.env.PREFIX.includes('com.termux');
+    if (isTermux) {
+      console.log(chalk.gray('\n   Access files with: cd "' + serverPath + '"'));
+    }
+    console.log('');
   } catch (error) {
     spinner.fail('Download failed');
     console.error(chalk.red(`\n❌ Error: ${error.message}\n`));
